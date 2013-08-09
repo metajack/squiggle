@@ -5,7 +5,6 @@ use std::comm;
 use std::comm::{Port, Chan};
 use std::hashmap::HashSet;
 use std::rand::{Rng, RngUtil, IsaacRng};
-use std::str;
 
 pub trait Generator {
     pub fn gen_sym(&mut self) -> Id;
@@ -82,7 +81,7 @@ impl NaiveGen {
                                 loop 'newprog;
                             }
                         }
-                        printfln!("genned constrained prog in %u iters", i);
+                        // printfln!("genned constrained prog in %u iters", i);
                         chan.send(~prog);
                         break;
                     }
@@ -122,7 +121,7 @@ impl NaiveGenState {
 
 impl Generator for NaiveGenState {
     pub fn gen_sym(&mut self) -> Id {
-        let mut num = self.next_symbol;
+        let num = self.next_symbol;
         self.next_symbol += 1;
         num as uint
     }
@@ -223,10 +222,11 @@ impl Generator for NaiveGenState {
 mod tests {
     use extra::test::BenchHarness;
     use super::*;
+    use std::hashmap::HashSet;
 
     #[bench]
     fn bench_gen_prog(bh: &mut BenchHarness) {
-        let mut gen = NaiveGen::new(30, ~[]);
+        let mut gen = NaiveGen::new(30, ~HashSet::new(), ~[]);
         do bh.iter {
             gen.next();
         }

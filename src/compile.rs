@@ -1,4 +1,3 @@
-use std::hashmap::HashMap;
 use program::*;
 use eval::Eval;
 use extra::smallintmap::SmallIntMap;

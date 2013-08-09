@@ -15,12 +15,13 @@ fn id_to_str(mut num: Id) -> ~str {
     s
 }
 
+#[deriving(Eq)]
 pub struct Program {
     id: Id,
     expr: ~Expr,
 }
 
-#[deriving(Rand)]
+#[deriving(Rand,Eq)]
 pub enum UnaOp {
     Not,
     Shl1,
@@ -29,7 +30,7 @@ pub enum UnaOp {
     Shr16,
 }
 
-#[deriving(Rand)]
+#[deriving(Rand,Eq)]
 pub enum BinOp {
     And,
     Or,
@@ -37,6 +38,7 @@ pub enum BinOp {
     Plus,
 }
 
+#[deriving(Eq)]
 pub enum Expr {
     Zero,
     One,
