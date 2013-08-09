@@ -32,7 +32,7 @@ fn main() {
             if args.len() != 3 {
                 println("error: missing training size");
             } else {
-                train(FromStr::from_str(args[2]).expect("bad size"));
+                train(FromStr::from_str(args[2]).expect("bad size"), Empty);
             }
         }
         ~"problems" => problems(),
@@ -45,10 +45,27 @@ fn status() {
     println(status.to_str());
 }
 
-fn train(size: u8) {
-    // TODO generate training problems of given size, eval, and guess in a loop
-    // let mut api = WebApi::new();
-    // let prob = api.get_training_blocking();
+fn train(size: u8, operator: TrainOperator) {
+    let mut api = WebApi::new();
+    loop {
+        let prob = api.get_training_blocking(size, operator);
+        printfln!("TRAIN: %s (%u)", prob.problem.id, prob.problem.size as uint);
+
+        let mut rng = std::rand::task_rng();
+        let mut tests = ~[];
+        for _ in range(0, 50) {
+            tests.push(rng.gen::<u64>());
+        }
+
+        let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
+        let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
+
+        let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
+
+        let candidate = gen.next();
+        println(candidate.to_str());
+        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()))
+    }
 }
 
 fn problems() {
@@ -60,7 +77,7 @@ fn problems() {
     sort::tim_sort(unsolved_probs);
 
     for prob in unsolved_probs.iter() {
-        printfln!("attempting problem %s (%u)", prob.id, prob.size as uint);
+        printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
 
         let mut rng = std::rand::task_rng();
         let mut tests = ~[];
@@ -68,13 +85,13 @@ fn problems() {
             tests.push(rng.gen::<u64>());
         }
 
-        let constraints = api.eval_blocking(prob.clone(), tests.clone()).expect("coulnd't eval tests");
+        let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
         let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
 
-        let mut gen = NaiveGen::new(prob.size, prob.operators, pairs);
+        let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
 
         let candidate = gen.next();
         println(candidate.to_str());
-        printfln!(api.guess_blocking(prob.clone(), candidate.to_str()))
+        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()))
     }
 }

@@ -60,6 +60,17 @@ impl WebApi {
         port.recv()
     }
 
+    pub fn get_training(&mut self, size: u8, operator: TrainOperator) -> Port<TrainProblem> {
+        let (port, chan) = comm::stream();
+        (**self).send(Train(size, operator, chan));
+        port
+    }
+
+    pub fn get_training_blocking(&mut self, size: u8, operator: TrainOperator) -> TrainProblem {
+        let port = self.get_training(size, operator);
+        port.recv()
+    }
+
     pub fn get_problems(&mut self) -> Port<~[RealProblem]> {
         let (port, chan) = comm::stream();
         (**self).send(Problems(chan));
@@ -71,24 +82,24 @@ impl WebApi {
         port.recv()
     }
 
-    pub fn eval(&mut self, problem: RealProblem, inputs: ~[u64]) -> Port<Option<~[u64]>> {
+    pub fn eval(&mut self, problem: Problem, inputs: ~[u64]) -> Port<Option<~[u64]>> {
         let (port, chan) = comm::stream();
         (**self).send(Eval(problem, inputs, chan));
         port
     }
 
-    pub fn eval_blocking(&mut self, problem: RealProblem, inputs: ~[u64]) -> Option<~[u64]> {
+    pub fn eval_blocking(&mut self, problem: Problem, inputs: ~[u64]) -> Option<~[u64]> {
         let port = self.eval(problem, inputs);
         port.recv()
     }
 
-    pub fn guess(&mut self, problem: RealProblem, program: ~str) -> Port<GuessResult> {
+    pub fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult> {
         let (port, chan) = comm::stream();
         (**self).send(Guess(problem, program, chan));
         port
     }
 
-    pub fn guess_blocking(&mut self, problem: RealProblem, program: ~str) -> GuessResult {
+    pub fn guess_blocking(&mut self, problem: Problem, program: ~str) -> GuessResult {
         let port = self.guess(problem, program);
         port.recv()
     }
@@ -121,9 +132,11 @@ fn dispatch(req: Request) {
 
                     resp_chan.send(TrainProblem {
                         challenge: challenge,
-                        id: id,
-                        size: size as u8,
-                        operators: ops,
+                        problem: Problem {
+                            id: id,
+                            size: size as u8,
+                            operators: ops,
+                        },
                     });
                 }
                 _ => fail!("bad response"),
@@ -164,11 +177,13 @@ fn dispatch(req: Request) {
                         ops.add(str_ops);
 
                         RealProblem {
-                            id: id,
-                            size: size as u8,
-                            solved: solved,
+                            problem: Problem {
+                                id: id,
+                                size: size as u8,
+                                operators: ops,
+                            },
                             time_left: time_left,
-                            operators: ops
+                            solved: solved,
                         }
                     }
                     _ => fail!("invalid response")
@@ -186,8 +201,8 @@ enum Request {
     Status(Chan<StatusResponse>),
     Train(u8, TrainOperator, Chan<TrainProblem>),
     Problems(Chan<~[RealProblem]>),
-    Eval(RealProblem, ~[u64], Chan<Option<~[u64]>>),
-    Guess(RealProblem, ~str, Chan<GuessResult>),
+    Eval(Problem, ~[u64], Chan<Option<~[u64]>>),
+    Guess(Problem, ~str, Chan<GuessResult>),
 }
 
 pub enum TrainOperator {
@@ -234,36 +249,33 @@ impl ToStr for StatusResponse {
     }
 }
 
-pub struct TrainProblem {
-    challenge: ~str,
+#[deriving(Clone, Eq)]
+pub struct Problem {
     id: ~str,
     size: u8,
     operators: OperatorSet,
 }
 
-impl WebEval for TrainProblem {
-    fn get_id(&self) -> ~str {
-        self.id.to_owned()
-    }
+pub struct TrainProblem {
+    challenge: ~str,
+    problem: Problem,
 }
 
 #[deriving(Clone, Eq)]
 pub struct RealProblem {
-    id: ~str,
-    size: u8,
-    operators: OperatorSet,
+    problem: Problem,
     time_left: Option<float>,
     solved: bool,
 }
 
 impl Ord for RealProblem {
     fn lt(&self, other: &RealProblem) -> bool {
-        self.size < other.size
+        self.problem.size < other.problem.size
     }
 }
 
 
-impl WebEval for RealProblem {
+impl WebEval for Problem {
     fn get_id(&self) -> ~str {
         self.id.to_owned()
     }
