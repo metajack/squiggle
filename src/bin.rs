@@ -6,10 +6,12 @@ extern mod std;
 extern mod extra;
 
 use webapi::{Request, TrainOperators, Empty};
-use program::{Ident, Program};
+use program::*;
+use eval::Eval;
 
 pub mod webapi;
 pub mod program;
+pub mod eval;
 
 fn main() {
     // let status = webapi::Request::get_status();
@@ -18,4 +20,9 @@ fn main() {
     // let prob = webapi::Request::get_training_problem(3, Empty);
 
     println(Program::new(~"x", ~Ident(~"x")).to_str());
+
+    // (|x| x << 1 + x)(10)
+    printfln!(Program::new(~"x", ~Op2(Plus,
+                                      ~Op1(Shl1, ~Ident(~"x")),
+                                      ~Ident(~"x"))).eval(10));
 }
