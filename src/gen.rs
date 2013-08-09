@@ -85,7 +85,7 @@ impl NaiveGen {
                                 loop 'newprog;
                             }
                         }
-                        printfln!("genned constrained prog in %u iters", i);
+                        debug!("genned constrained prog in %u iters", i);
                         chan.send(~prog);
                         break;
                     }
@@ -225,11 +225,11 @@ impl Generator for NaiveGenState {
 mod tests {
     use extra::test::BenchHarness;
     use super::*;
-    use std::hashmap::HashSet;
+    use webapi::*;
 
     #[bench]
     fn bench_gen_prog(bh: &mut BenchHarness) {
-        let mut gen = NaiveGen::new(30, ~HashSet::new(), ~[]);
+        let mut gen = NaiveGen::new(30, OperatorSet::new(), ~[]);
         do bh.iter {
             gen.next();
         }
