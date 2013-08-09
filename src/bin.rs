@@ -43,7 +43,7 @@ fn main() {
     // some random programs
     let mut gen = NaiveGen::new(30);
     for _ in range(0, 5) {
-        printfln!(gen.gen_prog().to_str());
+        printfln!(gen.next().to_str());
         gen.reset();
     }
 
@@ -62,12 +62,12 @@ fn main() {
     println(find_matching_with_constraints(3, constraints).to_str());
 }
 
-fn find_matching(match_against: &Program) -> Program {
+fn find_matching(match_against: &Program) -> ~Program {
     let mut rng = std::rand::task_rng();
     let mut gen = NaiveGen::new(30);
 
     for i in std::iterator::count(0u, 1) {
-        let prog = gen.gen_prog();
+        let prog = gen.next();
 
         // say that if it matches on 10000 random numbers, then it's a
         // proper match.
@@ -83,11 +83,11 @@ fn find_matching(match_against: &Program) -> Program {
 }
 
 // TODO this needs to take a max time to think
-fn find_matching_with_constraints(max_size: u8, constraints: &[(u64, u64)]) -> Program {
+fn find_matching_with_constraints(max_size: u8, constraints: &[(u64, u64)]) -> ~Program {
     let mut iterations = 0;
     'newprog: loop {
         let mut gen = NaiveGen::new(max_size);
-        let prog = gen.gen_prog();
+        let prog = gen.next();
         iterations += 1;
 
         let mut failed = false;

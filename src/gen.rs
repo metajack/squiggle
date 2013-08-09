@@ -1,5 +1,8 @@
 use program::*;
 
+use std::cell::Cell;
+use std::comm;
+use std::comm::{Port, Chan};
 use std::num::ToStrRadix;
 use std::rand::{Rng, RngUtil, IsaacRng, IsaacRng};
 use std::str;
@@ -12,44 +15,97 @@ pub trait Generator {
     pub fn get_sym(&mut self) -> ~str;
 }
 
+pub enum GenMsg {
+    Reset(u8, ~[(u64, u64)]),
+    Generate(Chan<~Program>),
+    Exit,
+}
+
 type Scope = ~[~str];
 
 struct ScopeStack {
     stack: ~[Scope],
 }
 
-pub struct NaiveGen {
+pub struct NaiveGen(Chan<GenMsg>);
+
+pub struct NaiveGenState {
     rng: IsaacRng,
     scopes: ScopeStack,
     next_symbol: u8,
     max_size: u8,
+    constraints: ~[(u64, u64)],
     size: u8,
 }
 
 impl NaiveGen {
     pub fn new(max_size: u8) -> NaiveGen {
-        assert!(max_size >= 3 && max_size <= 30);
-        NaiveGen {
+        let (port, chan) = comm::stream();
+
+        let port = Cell::new(port);
+        do spawn {
+            NaiveGen::generate(port.take());
+        }
+
+        chan.send(Reset(max_size, ~[]));
+        NaiveGen(chan)
+    }
+
+    pub fn reset(&mut self) {
+        (**self).send(Reset(30, ~[]));
+    }
+
+    pub fn next(&mut self) -> ~Program {
+        let (port, chan) = comm::stream();
+        (**self).send(Generate(chan));
+        port.recv()
+    }
+
+    fn generate(port: Port<GenMsg>) {
+        let mut gen = NaiveGenState::new();
+        loop {
+            match port.try_recv() {
+                None => return,
+                Some(Exit) => return,
+                Some(Reset(max_size, constraints)) => {
+                    gen.reset(max_size, constraints);
+                }
+                Some(Generate(chan)) => {
+                    let prog = gen.gen_prog();
+                    chan.send(~prog);
+                }
+            }
+        }
+    }
+}
+
+impl NaiveGenState {
+    pub fn new() -> NaiveGenState {
+        NaiveGenState {
             rng: IsaacRng::new(),
             scopes: ScopeStack {
                 stack: ~[],
             },
             next_symbol: 0,
-            max_size: max_size,
+            max_size: 30,
+            constraints: ~[],
             size: 0,
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, max_size: u8, constraints: ~[(u64, u64)]) {
+        assert!(max_size >= 3 && max_size <= 30);
         self.scopes = ScopeStack {
             stack: ~[],
         };
         self.next_symbol = 0;
+        self.max_size = max_size;
+        self.constraints = constraints;
         self.size = 0;
     }
 }
 
-impl Generator for NaiveGen {
+impl Generator for NaiveGenState {
     pub fn gen_sym(&mut self) -> ~str {
         let mut num = self.next_symbol;
         self.next_symbol += 1;
@@ -163,7 +219,7 @@ mod tests {
     fn bench_gen_prog(bh: &mut BenchHarness) {
         let mut gen = NaiveGen::new(30);
         do bh.iter {
-            gen.gen_prog();
+            gen.next();
         }
     }
 }
