@@ -17,6 +17,7 @@ pub mod gen;
 pub mod parse;
 pub mod program;
 pub mod webapi;
+pub mod compile;
 
 fn main() {
     // println(Program::new(~"x", ~Ident(~"x")).to_str());
