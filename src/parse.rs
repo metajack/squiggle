@@ -2,26 +2,55 @@ use program::Expr;
 
 pub type ParseResult = Result<~Expr, ~str>;
 
-pub fn parse(input: &str) -> ParseResult {
-    consume_lambda(input)
+pub trait Parse {
+    pub fn parse(&self) -> ParseResult;
 }
 
-pub fn consume_lambda(_input: &str) -> ParseResult {
-    Err(~"Not yet implemented.")
+impl<'self> Parse for &'self str {
+    pub fn parse(&self) -> ParseResult {
+        Parser {
+            src_pos: 0,
+            src: *self,
+        }.parse()
+    }
 }
 
-pub fn comsume_expression(_input: &str) -> ParseResult {
-    Err(~"Not yet implemented.")
+pub struct Parser<'self> {
+    priv src_pos: uint,
+    priv src: &'self str,
 }
 
-pub fn consume_op1(_input: &str) -> ParseResult {
-    Err(~"Not yet implemented.")
+impl<'self> Parse for Parser<'self> {
+    pub fn parse(&self) -> ParseResult {
+        self.consume_lambda()
+    }
 }
 
-pub fn consume_op2(_input: &str) -> ParseResult {
-    Err(~"Not yet implemented.")
-}
+impl<'self> Parser<'self> {
+    pub fn consume_ws(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
+    pub fn consume_str(&self, _expected: &str) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
 
-pub fn consume_id(_input: &str) -> ParseResult {
-    Err(~"Not yet implemented.")
+    pub fn consume_lambda(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
+
+    pub fn comsume_expression(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
+
+    pub fn consume_op1(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
+
+    pub fn consume_op2(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
+
+    pub fn consume_id(&self) -> ParseResult {
+        Err(~"Not yet implemented.")
+    }
 }
