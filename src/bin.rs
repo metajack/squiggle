@@ -5,6 +5,7 @@
 extern mod std;
 extern mod extra;
 
+use std::hashmap::HashSet;
 use std::rand::RngUtil;
 use eval::Eval;
 use gen::*;
@@ -59,14 +60,29 @@ fn main() {
     let status = Request::get_status();
     println(status.to_str());
 
-    let prob = webapi::Request::get_training_problem(5, Empty);
+    let prob = Request::get_training_problem(5, Empty);
     printfln!("%?", prob);
 
+    // generate tests for /eval
+    let mut rng = std::rand::task_rng();
+    let mut tests = ~[];
+    for _ in range(0, 50) {
+        tests.push(rng.gen::<u64>());
+    }
+
+    let constraints = Request::get_eval_results(tests);
+    let mut gen = NaiveGen::new(prob.size, prob.operators, constraints);
+    // TODO turn NaiveGen into an iterator:
+    //   for candidate in program_gen() {
+    //       ...
+    //   }
+    let _candidate = gen.next();
+    // TODO: guess
 }
 
 fn find_matching(match_against: &Program) -> ~Program {
     let mut rng = std::rand::task_rng();
-    let mut gen = NaiveGen::new(30, ~[]);
+    let mut gen = NaiveGen::new(30, ~HashSet::new(), ~[]);
 
     for i in std::iterator::count(0u, 1) {
         let prog = gen.next();
@@ -82,10 +98,4 @@ fn find_matching(match_against: &Program) -> ~Program {
         }
     }
     fail!()
-}
-
-// TODO this needs to take a max time to think
-fn find_matching_with_constraints(max_size: u8, constraints: ~[(u64, u64)]) -> ~Program {
-    let mut gen = NaiveGen::new(max_size, constraints);
-    gen.next()
 }

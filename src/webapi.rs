@@ -53,6 +53,11 @@ impl Request {
         StatusResponse(response)
     }
 
+    pub fn get_eval_results(_tests: ~[u64]) -> ~[(u64, u64)] {
+        // TODO: implement this
+        ~[]
+    }
+
     pub fn get_training_problem(size: u8, operators: TrainOperators) -> TrainingProblem {
         let req = Train { size: size, operators: operators };
         let response = post_request(req.to_url(), req.to_json_str());
