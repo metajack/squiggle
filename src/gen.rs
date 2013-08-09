@@ -82,10 +82,15 @@ impl NaiveGen {
                         i += 1;
                         for &(x, y) in gen.constraints.iter() {
                             if prog.eval(x) != y {
+                                if i % 1000000 == 0 {
+                                    printfln!("gen stats: searched for %u iters", i);
+                                }
                                 loop 'newprog;
                             }
                         }
-                        debug!("genned constrained prog in %u iters", i);
+                        if i > 1 {
+                            printfln!("gen stats: candidate took %u iters", i);
+                        }
                         chan.send(~prog);
                         break;
                     }
