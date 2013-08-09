@@ -50,6 +50,16 @@ fn main() {
     let prog = Program::new(~"x", ~Op2(Plus, ~Ident(~"x"), ~Ident(~"x")));
     printfln!("matching against %s", prog.to_str());
     println(find_matching(&prog).to_str());
+
+    let prog = Program::new(~"x", ~Op1(Shr1, ~Ident(~"x")));
+    let mut constraints = ~[];
+    let mut rng = std::rand::task_rng();
+    for _ in range(0, 10) {
+        let x = rng.gen();
+        constraints.push((x, prog.eval(x)));
+    }
+    printfln!("finding match for %s", prog.to_str());
+    println(find_matching_with_constraints(3, constraints).to_str());
 }
 
 fn find_matching(match_against: &Program) -> Program {
@@ -68,6 +78,28 @@ fn find_matching(match_against: &Program) -> Program {
             printfln!("checked %u programs", i);
             return prog;
         }
+    }
+    fail!()
+}
+
+// TODO this needs to take a max time to think
+fn find_matching_with_constraints(max_size: u8, constraints: &[(u64, u64)]) -> Program {
+    let mut iterations = 0;
+    'newprog: loop {
+        let mut gen = NaiveGen::new(max_size);
+        let prog = gen.gen_prog();
+        iterations += 1;
+
+        let mut failed = false;
+        for &(x, y) in constraints.iter() {
+            if prog.eval(x) != y {
+                failed = true;
+                loop 'newprog;
+            }
+        }
+
+        printfln!("checked %u programs", iterations);
+        return prog;
     }
     fail!()
 }
