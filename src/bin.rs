@@ -5,9 +5,13 @@
 extern mod std;
 extern mod extra;
 
+use webapi::{Request, TrainOperators, Empty};
+
 pub mod webapi;
 
 fn main() {
-    let response = webapi::Request::status();
-    println(response.to_str());
+    let status = webapi::Request::get_status();
+    println(status.to_str());
+
+    let prob = webapi::Request::get_training_problem(3, Empty);
 }
