@@ -54,17 +54,14 @@ impl Generator for NaiveGen {
         let mut num = self.next_symbol;
         self.next_symbol += 1;
 
-        let mut div = 0;
-        let mut rem = 0;
         let mut id = ~[];
         loop {
-            let (div0, rem0) = num.div_rem(&26);
-            div = div0;
-            rem = rem0;
+            let (div, rem) = num.div_rem(&26);
             id.push(rem + 97 as u8);
             if div == 0 {
                 break;
             }
+            num = div;
         }
         str::from_bytes(id)
     }
@@ -144,7 +141,10 @@ impl Generator for NaiveGen {
         self.scopes.stack.push(scope);
         self.size += 1;
         let expr = self.gen_expr();
-        Program::new(sym, ~expr)
+        self.scopes.stack.clear();
+        let ret = Program::new(sym, ~expr);
+
+        ret
     }
 
     pub fn get_sym(&mut self) -> ~str {
