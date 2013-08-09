@@ -36,6 +36,25 @@ impl Program {
             expr: expr,
         }
     }
+
+    pub fn len(&self) -> u8 {
+        1 + self.expr.len()
+    }
+}
+
+impl Expr {
+    pub fn len(&self) -> u8 {
+        match *self {
+            Zero => 1,
+            One => 1,
+            Ident(*) => 1,
+            If0(ref test, ref then, ref other) => {
+                1 + test.len() + then.len() + other.len()
+            }
+            Op1(_, ref expr) => 1 + expr.len(),
+            Op2(_, ref left, ref right) => 1 + left.len() + right.len(),
+        }
+    }
 }
 
 impl FromStr for Program {
