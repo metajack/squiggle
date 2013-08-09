@@ -26,4 +26,14 @@ fn main() {
     printfln!(Program::new(~"x", ~Op2(Plus,
                                       ~Op1(Shl1, ~Ident(~"x")),
                                       ~Ident(~"x"))).eval(10));
+
+    let prog = Program::new(~"x", ~Fold {
+            foldee: ~Ident(~"x"),
+            init: ~Zero,
+            accum_id: ~"y",
+            next_id: ~"z",
+            body: ~Op2(Or, ~Ident(~"y"), ~Ident(~"z"))
+        });
+
+    printfln!(prog.eval(0x1122334455667788))
 }

@@ -1,15 +1,16 @@
 use program::*;
 
-// immutable linked list
-struct Scope<'self> {
-    id: &'self str,
+// immutable linked list, lifetime don't work well enough (yet; need
+// the ability for 2 lifetimes) for this to avoid @.
+struct Scope {
+    id: ~str,
     val: u64,
-    parent: Option<&'self Scope<'self>>
+    parent: Option<@Scope>
 }
 
-impl<'self> Scope<'self> {
-    fn push(&'self self, id: &'self str, val: u64) -> Scope<'self> {
-        Scope {
+impl Scope {
+    fn push(@self, id: ~str, val: u64) -> @Scope {
+        @Scope {
             id: id,
             val: val,
             parent: Some(self)
@@ -27,7 +28,7 @@ impl<'self> Scope<'self> {
         }
     }
 
-    fn eval(&self, expr: &Expr) -> u64 {
+    fn eval(@self, expr: &Expr) -> u64 {
         match *expr {
             Zero => 0,
             One => 1,
@@ -61,6 +62,26 @@ impl<'self> Scope<'self> {
                     Plus => e1 + e2
                 }
             }
+            Fold {
+                foldee: ~ref foldee, init: ~ref init,
+                next_id: ref next_id, accum_id: ref accum_id,
+                body: ~ref body
+            } => {
+                let mut foldee = self.eval(foldee);
+                let mut accum = self.eval(init);
+
+                for _ in range(0, 8) {
+                    let b = foldee & 0xff;
+                    foldee >>= 8;
+
+                    let scope = self.push(next_id.clone(), b);
+                    let scope = scope.push(accum_id.clone(), accum);
+
+                    accum = scope.eval(body)
+                }
+
+                accum
+            }
         }
     }
 }
@@ -70,8 +91,8 @@ pub trait Eval {
 }
 impl Eval for Program {
     fn eval(&self, val: u64) -> u64 {
-        (Scope {
-                id: self.id,
+        (@Scope {
+                id: self.id.clone(),
                 val: val,
                 parent: None
             }).eval(self.expr)

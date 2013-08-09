@@ -27,6 +27,13 @@ pub enum Expr {
     If0(~Expr, ~Expr, ~Expr),
     Op1(UnaOp, ~Expr),
     Op2(BinOp, ~Expr, ~Expr),
+    Fold {
+        foldee: ~Expr,
+        init: ~Expr,
+        accum_id: ~str,
+        next_id: ~str,
+        body: ~Expr
+    }
 }
 
 impl Program {
@@ -53,6 +60,9 @@ impl Expr {
             }
             Op1(_, ref expr) => 1 + expr.len(),
             Op2(_, ref left, ref right) => 1 + left.len() + right.len(),
+            Fold {foldee: ref foldee, init: ref init, body: ref body, _ } => {
+                2 + foldee.len() + init.len() + body.len()
+            }
         }
     }
 }
@@ -129,6 +139,16 @@ impl ToStr for Expr {
                 e.push_str(right.to_str());
                 e.push_str(")");
                 e
+            }
+            Fold {
+                foldee: ref foldee, init: ref init,
+                accum_id: ref accum_id, next_id: ref next_id,
+                body: ref body
+            } => {
+                fmt!("(fold %s %s (lambda (%s %s) %s))",
+                     foldee.to_str(), init.to_str(),
+                     *accum_id, *next_id,
+                     body.to_str())
             }
         }
     }
