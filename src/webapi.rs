@@ -230,9 +230,9 @@ impl Request {
                 let mut obj: TreeMap<~str, Json> = TreeMap::new();
                 obj.insert(~"size", size.to_json());
                 obj.insert(~"operators", match *ops {
-                    Empty => (~"").to_json(),
-                    Tfold => (~"tfold").to_json(),
-                    Fold => (~"fold").to_json(),
+                    Empty => (~[~""]).to_json(),
+                    Tfold => (~[~"tfold"]).to_json(),
+                    Fold => (~[~"fold"]).to_json(),
                 });
                 obj.to_json().to_str()
             }
@@ -338,8 +338,6 @@ trait WebEval {
     }
 }
 
-
-
 fn get_json_array<'a>(obj: &'a Object, key: ~str) -> ~[Json] {
     match obj.find(&key) {
         Some(&List(ref l)) => l.clone(),
@@ -371,8 +369,10 @@ fn make_url(path: &str) -> ~str {
 }
 
 fn get_request(url: ~str) -> ~Json {
+    info!("GET /%s", extract_path(url));
     let mut p = Process::new("curl", [url], ProcessOptions::new());
     let output = str::from_bytes(p.output().read_whole_stream());
+    info!("HTTP: %s", output);
     match json::from_str(output) {
         Ok(res) => ~res,
         Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
@@ -380,10 +380,22 @@ fn get_request(url: ~str) -> ~Json {
 }
 
 fn post_request(url: ~str, data: ~str) -> ~Json {
+    info!("GET /%s", extract_path(url));
+    info!("DATA: %s", data);
     let mut p = Process::new("curl", [~"-X", ~"POST", url.clone(), ~"-d", data], ProcessOptions::new());
     let output = str::from_bytes(p.output().read_whole_stream());
+    info!("HTTP: %s", output);
     match json::from_str(output) {
         Ok(res) => ~res,
         Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
     }
+}
+
+fn extract_path(url: &str) -> ~str {
+    let mut pieces = url.split_iter('/');
+    let path_opt = pieces.nth(3);
+    let path = path_opt.get_ref().to_owned();
+    let mut pieces = path.split_iter('?');
+    let path = pieces.nth(0);
+    path.get_ref().to_owned()
 }
