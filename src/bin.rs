@@ -10,7 +10,7 @@ use gen::*;
 use webapi::*;
 
 use std::os;
-use std::rand::RngUtil;
+use std::rand::{RngUtil, XorShiftRng};
 use std::vec;
 use extra::sort;
 use extra::time;
@@ -50,11 +50,12 @@ fn status() {
 fn train(size: u8, operator: TrainOperator) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
+    let mut rng = seeded_rng();
+
     loop {
         let prob = api.get_training_blocking(size, operator);
         printfln!("TRAIN: %s (%u)", prob.problem.id, prob.problem.size as uint);
 
-        let mut rng = std::rand::task_rng();
         let mut tests = ~[];
         for _ in range(0, 50) {
             tests.push(rng.gen::<u64>());
@@ -78,6 +79,7 @@ fn train(size: u8, operator: TrainOperator) {
 fn problems() {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
+    let mut rng = seeded_rng();
 
     let probs = api.get_problems_blocking();
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter()
@@ -88,7 +90,6 @@ fn problems() {
     for prob in unsolved_probs.iter() {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
 
-        let mut rng = std::rand::task_rng();
         let mut tests = ~[];
         for _ in range(0, 50) {
             tests.push(rng.gen::<u64>());
@@ -151,4 +152,13 @@ impl Statistics {
         let avg = (sum as f64) / (self.size as f64);
         printfln!("stats: avg candidate time is %ums", (avg / 1000000f64) as uint);
     }
+}
+
+fn seeded_rng() -> XorShiftRng {
+    let mut seed_rng = std::rand::task_rng();
+    XorShiftRng::new_seeded(
+        seed_rng.gen::<u32>(),
+        seed_rng.gen::<u32>(),
+        seed_rng.gen::<u32>(),
+        seed_rng.gen::<u32>())
 }

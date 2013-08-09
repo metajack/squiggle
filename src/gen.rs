@@ -4,7 +4,7 @@ use webapi::*;
 use std::cell::Cell;
 use std::comm;
 use std::comm::{Port, Chan};
-use std::rand::{Rng, RngUtil, IsaacRng};
+use std::rand::{Rng, RngUtil, XorShiftRng, task_rng};
 use std::vec;
 
 pub trait Generator {
@@ -25,7 +25,7 @@ pub enum GenMsg {
 pub struct NaiveGen(Chan<GenMsg>);
 
 pub struct NaiveGenState {
-    rng: IsaacRng,
+    rng: XorShiftRng,
     scope_stack: ~[Id],
     next_symbol: u8,
     max_size: u8,
@@ -102,8 +102,14 @@ impl NaiveGen {
 
 impl NaiveGenState {
     pub fn new() -> NaiveGenState {
+        let mut seed_rng = task_rng();
+        let rng = XorShiftRng::new_seeded(
+            seed_rng.gen::<u32>(),
+            seed_rng.gen::<u32>(),
+            seed_rng.gen::<u32>(),
+            seed_rng.gen::<u32>());
         NaiveGenState {
-            rng: IsaacRng::new(),
+            rng: rng,
             scope_stack: vec::with_capacity(100),
             next_symbol: 0,
             max_size: 30,
@@ -236,6 +242,7 @@ mod tests {
     use extra::test::BenchHarness;
     use super::*;
     use webapi::*;
+    use program::*;
 
     #[bench]
     fn bench_gen_prog(bh: &mut BenchHarness) {
