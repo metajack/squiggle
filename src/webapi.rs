@@ -1,15 +1,49 @@
 use program::*;
 
+use std::cell::Cell;
+use std::comm;
+use std::io::ReaderUtil;
 use std::run::{Process, ProcessOptions};
+use std::str;
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
 use extra::json;
 use extra::json::{Json, ToJson, Object, Number, String, List, Boolean};
+use extra::time;
 use extra::treemap::TreeMap;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
 static PRIVATE_KEY: &'static str = include_str!("private.key");
+
+pub struct WebApi(Chan<Request>);
+
+impl WebApi {
+    pub fn new() -> WebApi {
+        let (port, chan) = comm::stream();
+
+        let port = Cell::new(port);
+        do spawn {
+            WebApi::run(port.take());
+        }
+
+        WebApi(chan)
+    }
+
+    fn run(port: Port<Request>) {
+        let mut running = true;
+        let mut last_req = 0;
+        while running {
+            match port.try_recv() {
+                None => running = false,
+                Some(req) => {
+                }
+            }
+
+            last_req = time::precise_time_ns();
+        }
+    }
+}
 
 enum Request {
     Status,
@@ -339,17 +373,18 @@ fn make_url(path: &str) -> ~str {
 
 fn get_request(url: ~str) -> ~Json {
     let mut p = Process::new("curl", [url], ProcessOptions::new());
-    match json::from_reader(p.output()) {
+    let output = str::from_bytes(p.output().read_whole_stream());
+    match json::from_str(output) {
         Ok(res) => ~res,
-        Err(e) => fail!(e.to_str()),
+        Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
     }
 }
 
 fn post_request(url: ~str, data: ~str) -> ~Json {
-    let mut p = Process::new("curl", [~"-X", ~"POST", url, ~"-d", data], ProcessOptions::new());
-
-    match json::from_reader(p.output()) {
+    let mut p = Process::new("curl", [~"-X", ~"POST", url.clone(), ~"-d", data], ProcessOptions::new());
+    let output = str::from_bytes(p.output().read_whole_stream());
+    match json::from_str(output) {
         Ok(res) => ~res,
-        Err(e) => fail!(e.to_str()),
+        Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
     }
 }
