@@ -1,4 +1,5 @@
-use extra::url::Url;
+use std::run::{Process, ProcessOptions};
+use extra::json;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
@@ -9,9 +10,11 @@ enum Request {
     Train { size: u8, operators: ~str },
 }
 
+
+
 impl Request {
-    pub fn to_url(&self) -> Url {
-        match self {
+    pub fn to_url(&self) -> ~str {
+        match *self {
             Status => {
                 make_url("status")
             }
@@ -19,15 +22,24 @@ impl Request {
         }
     }
 
+    pub fn status() {
+        println(Status.to_url());
+        let mut p = Process::new(
+            "curl",
+            [Status.to_url()],
+            ProcessOptions::new());
+
+        let out = p.output();
+        println(fmt!("read: %s", 
+                     json::to_pretty_str(&json::from_reader(out).unwrap())));
+    }
 }
 
-priv fn make_url(path: &str) -> Url {
-    let key = PRIVATE_KEY.clone().push_str("vpsH1H");
-    Url::new(
-        ~"http",
-        None,
-        ~"icfpc2013.cloudapp.net",
-        None,
-        path.clone(),
-        ~[(~"auth", key)])
+fn make_url(path: &str) -> ~str {
+    let mut s = ~"http://icfpc2013.cloudapp.net/";
+    s.push_str(path);
+    s.push_str("?auth=");
+    s.push_str(PRIVATE_KEY.trim());
+    s.push_str("vpsH1H");
+    s
 }

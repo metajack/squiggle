@@ -8,5 +8,5 @@ extern mod extra;
 pub mod webapi;
 
 fn main() {
-    println("hello, world");
+    webapi::Request::status();
 }
