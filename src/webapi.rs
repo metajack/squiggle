@@ -287,7 +287,7 @@ pub enum GuessResult {
     Error(~str)
 }
 
-pub trait WebEval {
+trait WebEval {
     fn get_id(&self) -> ~str;
 
     fn guess(&self, prog: ~str) -> GuessResult {
