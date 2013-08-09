@@ -40,14 +40,12 @@ impl WebApi {
             match port.try_recv() {
                 None => running = false,
                 Some(req) => {
-                    println("sleeping");
-                    timer.sleep(2500);
-                    printfln!("awake %?", time::precise_time_ns() - last_req);
+                    timer.sleep(3500);
                     dispatch(req);
                 }
             }
 
-            last_req = time::precise_time_ns();
+
         }
     }
 
@@ -81,6 +79,17 @@ impl WebApi {
 
     pub fn eval_blocking(&mut self, problem: RealProblem, inputs: ~[u64]) -> Option<~[u64]> {
         let port = self.eval(problem, inputs);
+        port.recv()
+    }
+
+    pub fn guess(&mut self, problem: RealProblem, program: ~str) -> Port<GuessResult> {
+        let (port, chan) = comm::stream();
+        (**self).send(Guess(problem, program, chan));
+        port
+    }
+
+    pub fn guess_blocking(&mut self, problem: RealProblem, program: ~str) -> GuessResult {
+        let port = self.guess(problem, program);
         port.recv()
     }
 }
@@ -169,6 +178,7 @@ fn dispatch(req: Request) {
             resp_chan.send(probs);
         }
         Eval(prob, inputs, resp_chan) => resp_chan.send(prob.eval(inputs)),
+        Guess(prob, prog, resp_chan) => resp_chan.send(prob.guess(prog)),
     }
 }
 
@@ -177,6 +187,7 @@ enum Request {
     Train(u8, TrainOperator, Chan<TrainProblem>),
     Problems(Chan<~[RealProblem]>),
     Eval(RealProblem, ~[u64], Chan<Option<~[u64]>>),
+    Guess(RealProblem, ~str, Chan<GuessResult>),
 }
 
 pub enum TrainOperator {

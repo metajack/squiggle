@@ -62,6 +62,6 @@ fn problems() {
 
         let candidate = gen.next();
         println(candidate.to_str());
-        printfln!(prob.guess(candidate.to_str()))
+        printfln!(api.guess_blocking(prob.clone(), candidate.to_str()))
     }
 }
