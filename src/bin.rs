@@ -55,7 +55,7 @@ fn find_matching(match_against: &Program) -> Program {
     let mut rng = std::rand::task_rng();
 
     for i in std::iterator::count(0u, 1) {
-        let mut gen = NaiveGen::new();
+        let mut gen = NaiveGen::new(30);
         let prog = gen.gen_prog();
 
         // say that if it matches on 10000 random numbers, then it's a

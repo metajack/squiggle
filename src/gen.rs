@@ -2,6 +2,7 @@ use program::*;
 
 use std::num::ToStrRadix;
 use std::rand::{Rng, RngUtil, IsaacRng, IsaacRng};
+use std::str;
 
 pub trait Generator {
     pub fn gen_sym(&mut self) -> ~str;
@@ -53,7 +54,19 @@ impl Generator for NaiveGen {
         let mut num = self.next_symbol;
         self.next_symbol += 1;
 
-        ~"x" + num.to_str_radix(26)
+        let mut div = 0;
+        let mut rem = 0;
+        let mut id = ~[];
+        loop {
+            let (div0, rem0) = num.div_rem(&26);
+            div = div0;
+            rem = rem0;
+            id.push(rem + 97 as u8);
+            if div == 0 {
+                break;
+            }
+        }
+        str::from_bytes(id)
     }
 
     pub fn gen_expr(&mut self) -> Expr {
