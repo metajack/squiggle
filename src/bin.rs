@@ -13,6 +13,7 @@ use webapi::{Request, TrainOperators, Empty};
 
 pub mod eval;
 pub mod gen;
+pub mod parse;
 pub mod program;
 pub mod webapi;
 
