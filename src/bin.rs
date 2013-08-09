@@ -11,7 +11,9 @@ use webapi::*;
 
 use std::os;
 use std::rand::RngUtil;
+use std::vec;
 use extra::sort;
+use extra::time;
 
 pub mod eval;
 pub mod gen;
@@ -47,6 +49,7 @@ fn status() {
 
 fn train(size: u8, operator: TrainOperator) {
     let mut api = WebApi::new();
+    let mut stats = Statistics::new();
     loop {
         let prob = api.get_training_blocking(size, operator);
         printfln!("TRAIN: %s (%u)", prob.problem.id, prob.problem.size as uint);
@@ -60,16 +63,22 @@ fn train(size: u8, operator: TrainOperator) {
         let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
         let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
 
+        stats.start();
         let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
 
         let candidate = gen.next();
+        stats.end();
+
         println(candidate.to_str());
-        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()))
+        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()));
+        stats.report();
     }
 }
 
 fn problems() {
     let mut api = WebApi::new();
+    let mut stats = Statistics::new();
+
     let probs = api.get_problems_blocking();
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter()
         .filter(|p| !p.solved && p.time_left.map_default(true, |&n| n > 0.0))
@@ -88,10 +97,58 @@ fn problems() {
         let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
         let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
 
+        stats.start();
         let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
 
         let candidate = gen.next();
+        stats.end();
+
         println(candidate.to_str());
-        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()))
+        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()));
+        stats.report();
+    }
+}
+
+struct Statistics {
+    start: u64,
+    cursor: uint,
+    history: ~[u64],
+    max_size: uint,
+    size: uint,
+}
+
+impl Statistics {
+    pub fn new() -> Statistics {
+        Statistics {
+            start: 0,
+            cursor: 0,
+            history: vec::from_elem(25, 0u64),
+            max_size: 25,
+            size: 0,
+        }
+    }
+
+    pub fn start(&mut self) {
+        assert!(self.start == 0);
+        self.start = time::precise_time_ns();
+    }
+
+    pub fn end(&mut self) {
+        let ns = time::precise_time_ns() - self.start;
+        self.start = 0;
+        self.history[self.cursor] = ns;
+        self.cursor = (self.cursor + 1) % 25;
+        if self.size < 25 {
+            self.size += 1;
+        }
+    }
+
+    pub fn report(&self) {
+        let mut sum = 0;
+        for v in self.history.iter() {
+            sum += *v;
+        }
+        let avg = (sum as f64) / (self.size as f64);
+        printfln!("stats: avg candidate time is %ums", (avg / 1000000f64) as uint);
     }
 }
