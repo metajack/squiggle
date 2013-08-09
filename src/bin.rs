@@ -8,6 +8,7 @@ extern mod extra;
 use webapi::{Request, TrainOperators, Empty};
 
 pub mod webapi;
+pub mod program;
 
 fn main() {
     let status = webapi::Request::get_status();
