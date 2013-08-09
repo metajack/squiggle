@@ -232,31 +232,11 @@ impl ToStr for Expr {
             One => ~"1",
             Ident(id) => id_to_str(id),
             If0(ref test, ref then, ref other) => {
-                let mut e = ~"(if0 ";
-                e.push_str(test.to_str());
-                e.push_str(" ");
-                e.push_str(then.to_str());
-                e.push_str(" ");
-                e.push_str(other.to_str());
-                e
+                fmt!("(if0 %s %s %s)", test.to_str(), then.to_str(), other.to_str())
             }
-            Op1(op, ref expr) => {
-                let mut e = ~"(";
-                e.push_str(op.to_str());
-                e.push_str(" ");
-                e.push_str(expr.to_str());
-                e.push_str(")");
-                e
-            }
+            Op1(op, ref expr) => fmt!("(%s %s)", op.to_str(), expr.to_str()),
             Op2(op, ref left, ref right) => {
-                let mut e = ~"(";
-                e.push_str(op.to_str());
-                e.push_str(" ");
-                e.push_str(left.to_str());
-                e.push_str(" ");
-                e.push_str(right.to_str());
-                e.push_str(")");
-                e
+                fmt!("(%s %s %s)", op.to_str(), left.to_str(), right.to_str())
             }
             Fold {
                 foldee: ref foldee, init: ref init,
