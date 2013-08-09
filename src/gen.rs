@@ -47,7 +47,7 @@ impl Generator for NaiveGen {
         let mut num = self.next_symbol;
         self.next_symbol += 1;
 
-        num.to_str_radix(26)
+        ~"x" + num.to_str_radix(26)
     }
 
     pub fn gen_expr(&mut self) -> Expr {
