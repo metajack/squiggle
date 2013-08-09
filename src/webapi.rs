@@ -40,7 +40,9 @@ impl WebApi {
             match port.try_recv() {
                 None => running = false,
                 Some(req) => {
-                    timer.sleep(5);
+                    println("sleeping");
+                    timer.sleep(2500);
+                    printfln!("awake %?", time::precise_time_ns() - last_req);
                     dispatch(req);
                 }
             }
@@ -89,7 +91,7 @@ fn dispatch(req: Request) {
             let response = get_request(req.to_url());
             resp_chan.send(StatusResponse(response));
         }
-        Train(size, ops, ref resp_chan) => {
+        Train(_, _, ref resp_chan) => {
             let response = post_request(req.to_url(), req.to_json_str());
 
             match *response {

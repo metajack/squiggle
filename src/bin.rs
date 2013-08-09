@@ -7,12 +7,10 @@ extern mod extra;
 
 use eval::Eval;
 use gen::*;
-use program::*;
 use webapi::*;
 
 use std::os;
 use std::rand::RngUtil;
-use extra::getopts;
 use extra::sort;
 
 pub mod eval;
