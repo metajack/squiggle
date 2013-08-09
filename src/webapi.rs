@@ -3,7 +3,7 @@ use std::run::{Process, ProcessOptions};
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
 use extra::json;
-use extra::json::{Json, ToJson, Object, Number, String, List};
+use extra::json::{Json, ToJson, Object, Number, String, List, Boolean};
 use extra::treemap::TreeMap;
 use program::Operator;
 
@@ -55,11 +55,6 @@ impl Request {
         StatusResponse(response)
     }
 
-    pub fn get_eval_results(_tests: ~[u64]) -> ~[(u64, u64)] {
-        // TODO: implement this
-        ~[]
-    }
-
     pub fn get_training_problem(size: u8, operators: TrainOperators) -> TrainingProblem {
         let req = Train { size: size, operators: operators };
         let response = post_request(req.to_url(), req.to_json_str());
@@ -69,16 +64,16 @@ impl Request {
                 let challenge = get_json_str(obj, ~"challenge");
                 let id = get_json_str(obj, ~"id");
                 let size = get_json_num(obj, ~"size");
-                let mut ops = ~HashSet::new();
+
                 let array = get_json_array(obj, ~"operators");
-                for op in array.iter() {
+                let ops = ~do array.iter().transform |op| {
                     match *op {
                         String(ref s) => {
-                            ops.insert(FromStr::from_str(*s).expect("bad value in 'operators'"))
+                            FromStr::from_str::<Operator>(*s).expect("bad value in 'operators'")
                         }
                         _ => fail!("bad value in 'operators'"),
-                    };
-                };
+                    }
+                }.collect();
 
                 TrainingProblem {
                     challenge: challenge,
@@ -89,6 +84,55 @@ impl Request {
             }
             _ => fail!("bad response"),
         }
+    }
+
+    pub fn get_real_problems() -> ~[RealProblem] {
+        let response = match get_request(make_url("myproblems")) {
+            ~List(a) => a,
+            _ => fail!("bad myproblems response")
+        };
+
+        do response.consume_iter().transform |x| {
+            match x {
+                Object(resp) => {
+                    let id = get_json_str(resp, ~"id");
+                    let size = get_json_num(resp, ~"size");
+
+                    let solved = do resp.find(&~"solved").map |b|  {
+                        match **b {
+                            Boolean(x) => x,
+                            _ => fail!("invalid solved boolean")
+                        }
+                    };
+
+                    let time_left = do resp.find(&~"timeLeft").map |tl| {
+                        match **tl {
+                            Number(x) => x,
+                            _ => fail!("invalid timeLeft number")
+                        }
+                    };
+                    let array = get_json_array(resp, ~"operators");
+                    let ops = ~do array.iter().transform |op| {
+                        match *op {
+                            String(ref s) => {
+                                FromStr::from_str::<Operator>(*s)
+                                    .expect("bad value in 'operators'")
+                            }
+                            _ => fail!("bad value in 'operators'"),
+                        }
+                    }.collect();
+
+                    RealProblem {
+                        id: id,
+                        size: size as u8,
+                        solved: solved,
+                        time_left: time_left,
+                        operators: ops
+                    }
+                }
+                _ => fail!("invalid response")
+            }
+        }.collect()
     }
 }
 
@@ -113,7 +157,21 @@ impl WebEval for TrainingProblem {
     }
 }
 
-enum GuessResult {
+pub struct RealProblem {
+    id: ~str,
+    size: u8,
+    operators: ~HashSet<Operator>,
+    time_left: Option<float>,
+    solved: Option<bool>
+}
+
+impl WebEval for RealProblem {
+    fn get_id(&self) -> ~str {
+        self.id.to_owned()
+    }
+}
+
+pub enum GuessResult {
     Win,
     Mismatch(u64, u64, u64),
     Error(~str)
