@@ -5,6 +5,7 @@ use std::comm;
 use std::comm::{Port, Chan};
 use std::hashmap::HashSet;
 use std::rand::{Rng, RngUtil, IsaacRng};
+use std::vec;
 
 pub trait Generator {
     pub fn gen_sym(&mut self) -> Id;
@@ -21,17 +22,11 @@ pub enum GenMsg {
     Exit,
 }
 
-type Scope = ~[Id];
-
-struct ScopeStack {
-    stack: ~[Scope],
-}
-
 pub struct NaiveGen(Chan<GenMsg>);
 
 pub struct NaiveGenState {
     rng: IsaacRng,
-    scopes: ScopeStack,
+    scope_stack: ~[Id],
     next_symbol: u8,
     max_size: u8,
     operations: ~HashSet<Operator>,
@@ -104,9 +99,7 @@ impl NaiveGenState {
     pub fn new() -> NaiveGenState {
         NaiveGenState {
             rng: IsaacRng::new(),
-            scopes: ScopeStack {
-                stack: ~[],
-            },
+            scope_stack: vec::with_capacity(100),
             next_symbol: 0,
             max_size: 30,
             operations: ~HashSet::new(),
@@ -117,9 +110,7 @@ impl NaiveGenState {
 
     pub fn reset(&mut self, max_size: u8, operations: ~HashSet<Operator>, constraints: ~[(u64, u64)]) {
         assert!(max_size >= 3 && max_size <= 30);
-        self.scopes = ScopeStack {
-            stack: ~[],
-        };
+        self.scope_stack.clear();
         self.next_symbol = 0;
         self.max_size = max_size;
         self.operations = operations;
@@ -189,10 +180,15 @@ impl Generator for NaiveGenState {
                         let init = self.gen_expr();
                         let next_id = self.gen_sym();
                         let accum_id = self.gen_sym();
-                        let scope = ~[next_id.clone(), accum_id.clone()];
-                        self.scopes.stack.push(scope);
+
+                        self.scope_stack.push(next_id);
+                        self.scope_stack.push(accum_id);
+
                         let body = self.gen_expr();
-                        self.scopes.stack.pop();
+
+                        self.scope_stack.pop();
+                        self.scope_stack.pop();
+
                         return Fold {
                             foldee: ~foldee,
                             init: ~init,
@@ -210,19 +206,17 @@ impl Generator for NaiveGenState {
 
     pub fn gen_prog(&mut self) -> Program {
         let sym = self.gen_sym();
-        let scope = ~[sym.clone()];
-        self.scopes.stack.push(scope);
+        self.scope_stack.push(sym);
         self.size += 1;
         let expr = self.gen_expr();
-        self.scopes.stack.clear();
+        self.scope_stack.clear();
         let ret = Program::new(sym, ~expr);
 
         ret
     }
 
     pub fn get_sym(&mut self) -> Id {
-        let syms = self.scopes.stack.concat_vec();
-        self.rng.choose(syms)
+        self.rng.choose(self.scope_stack)
     }
 }
 
