@@ -17,6 +17,7 @@ pub trait Generator {
 pub enum GenMsg {
     Reset(u8, ~HashSet<Operator>, ~[(u64, u64)]),
     Generate(Chan<~Program>),
+    MoreConstraints(~[(u64,u64)]),
     Exit,
 }
 
@@ -63,6 +64,10 @@ impl NaiveGen {
         port.recv()
     }
 
+    pub fn more_constraints(&mut self, cs: ~[(u64, u64)]) {
+        (**self).send(MoreConstraints(cs));
+    }
+
     fn generate(port: Port<GenMsg>) {
         let mut gen = NaiveGenState::new();
         loop {
@@ -71,6 +76,9 @@ impl NaiveGen {
                 Some(Exit) => break,
                 Some(Reset(max_size, operations, constraints)) => {
                     gen.reset(max_size, operations, constraints);
+                }
+                Some(MoreConstraints(c)) => {
+                    gen.constraints.push_all_move(c)
                 }
                 Some(Generate(chan)) => {
                     let mut i = 0;
