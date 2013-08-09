@@ -8,7 +8,7 @@ use std::vec;
 
 pub trait Generator {
     pub fn gen_sym(&mut self) -> Id;
-    pub fn gen_expr(&mut self) -> Expr;
+    pub fn gen_expr(&mut self, bool, bool) -> Expr;
     pub fn gen_prog(&mut self) -> Program;
 
     pub fn get_sym(&mut self) -> Id;
@@ -136,7 +136,7 @@ impl Generator for NaiveGenState {
         num as uint
     }
 
-    pub fn gen_expr(&mut self) -> Expr {
+    pub fn gen_expr(&mut self, used_fold: bool, top_level: bool) -> Expr {
         loop {
             let choice = self.rng.gen_uint_range(0, 7);
             match choice {
@@ -156,9 +156,9 @@ impl Generator for NaiveGenState {
                     let op_ok = self.operations.if0;
                     if op_ok && self.size + 4 <= self.max_size {
                         self.size += 1;
-                        let test = self.gen_expr();
-                        let then = self.gen_expr();
-                        let other = self.gen_expr();
+                        let test = self.gen_expr(used_fold, false);
+                        let then = self.gen_expr(used_fold, false);
+                        let other = self.gen_expr(used_fold, false);
                         return If0(~test, ~then, ~other);
                     }
                     loop;
@@ -168,7 +168,7 @@ impl Generator for NaiveGenState {
                         let op: UnaOp = self.rng.gen();
                         if op.in_ops(&self.operations) {
                             self.size += 1;
-                            let expr = self.gen_expr();
+                            let expr = self.gen_expr(used_fold, false);
                             return Op1(op, ~expr);
                         }
                     }
@@ -179,27 +179,30 @@ impl Generator for NaiveGenState {
                         let op: BinOp = self.rng.gen();
                         if op.in_ops(&self.operations) {
                             self.size += 1;
-                            let left = self.gen_expr();
-                            let right = self.gen_expr();
+                            let left = self.gen_expr(used_fold, false);
+                            let right = self.gen_expr(used_fold, false);
                             return Op2(op, ~left, ~right);
                         }
                     }
                     loop;
                 }
                 6 => { // fold
-                    // TODO: constrain against tfold
-                    let op_ok = self.operations.fold;
+                    let op_ok = if self.operations.tfold {
+                        top_level    
+                    } else {
+                        !used_fold && self.operations.fold
+                    };
                     if op_ok && self.size + 5 <= self.max_size {
                         self.size += 2;
-                        let foldee = self.gen_expr();
-                        let init = self.gen_expr();
+                        let foldee = self.gen_expr(true, false);
+                        let init = self.gen_expr(true, false);
                         let next_id = self.gen_sym();
                         let accum_id = self.gen_sym();
 
                         self.scope_stack.push(next_id);
                         self.scope_stack.push(accum_id);
 
-                        let body = self.gen_expr();
+                        let body = self.gen_expr(true, false);
 
                         self.scope_stack.pop();
                         self.scope_stack.pop();
@@ -223,7 +226,7 @@ impl Generator for NaiveGenState {
         let sym = self.gen_sym();
         self.scope_stack.push(sym);
         self.size += 1;
-        let expr = self.gen_expr();
+        let expr = self.gen_expr(false, true);
         self.scope_stack.clear();
         let ret = Program::new(sym, ~expr);
 
