@@ -152,3 +152,18 @@ impl Generator for NaiveGen {
         self.rng.choose(syms)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use extra::test::BenchHarness;
+    use super::*;
+
+    #[bench]
+    fn bench_gen_prog(bh: &mut BenchHarness) {
+        let mut gen = NaiveGen::new(30);
+        do bh.iter {
+            gen.gen_prog();
+        }
+    }
+}

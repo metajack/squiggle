@@ -98,3 +98,31 @@ impl Eval for Program {
             }).eval(self.expr)
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use program::*;
+    use extra::test::BenchHarness;
+    use std::rand;
+
+    #[bench]
+    fn bench_eval(bh: &mut BenchHarness) {
+        // collection of randomly generated programs
+        let progs = [
+                     Program::new(~"gg", ~Op1(Shr1, ~Ident(~"gg"))),
+                     Program::new(~"hg", ~Op1(Shl1, ~Ident(~"hg"))),
+                     ];
+        let mut rng = rand::rng();
+
+        do bh.iter {
+            for p in progs.iter() {
+                let p: &Program = p;
+                for _ in range(0, 10) {
+                    p.eval(rng.gen());
+                }
+            }
+        }
+    }
+}
