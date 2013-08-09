@@ -155,7 +155,7 @@ impl ToStr for Expr {
         match *self {
             Zero => ~"0",
             One => ~"1",
-            Ident(ref id) => id.to_str(),
+            Ident(id) => id_to_str(id),
             If0(ref test, ref then, ref other) => {
                 let mut e = ~"(if0 ";
                 e.push_str(test.to_str());
