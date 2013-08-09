@@ -1,9 +1,6 @@
 use std::hashmap::HashMap;
 use program::*;
 
-// just fail!'s on invalid input.
-pub type ParseResult = ~Expr;
-
 pub trait Parse {
     pub fn parse(&self) -> Program;
 }
@@ -16,7 +13,6 @@ impl<'self> Parse for &'self str {
 
 pub struct Parser<'self> {
     src: &'self str,
-
     interned: HashMap<~str, uint>,
     next_id: uint
 }
@@ -25,7 +21,6 @@ impl<'self> Parser<'self> {
     pub fn new<'r>(src: &'r str) -> Parser<'r> {
         Parser {
             src: src,
-
             interned: HashMap::new(),
             next_id: 0
         }
@@ -48,12 +43,12 @@ impl<'self> Parser<'self> {
         }
     }
 
-    pub fn is_eof(&self) -> bool {
-        self.src.is_empty()
-    }
     pub fn bump(&mut self) {
-        self.src = self.src.slice_from(self.src.char_range_at(0).next);
+        self.src = self.src.slice_from(
+            self.src.char_range_at(0).next
+        );
     }
+
     pub fn skip_ws(&mut self) {
         let mut offset = 0;
         for (new_offset, c) in self.src.char_offset_iter() {
@@ -75,11 +70,7 @@ impl<'self> Parser<'self> {
         }
     }
 
-    pub fn consume_ws(&mut self) -> ParseResult {
-        fail!("Not yet implemented.")
-    }
-
-    pub fn consume_expr(&mut self) -> ParseResult {
+    pub fn consume_expr(&mut self) -> ~Expr {
         let ret = match self.src.char_at(0) {
             '0' => { self.bump(); ~Zero }
             '1' => { self.bump(); ~One }
@@ -137,15 +128,13 @@ impl<'self> Parser<'self> {
         ret
     }
 
-    pub fn consume_op1(&mut self, op: UnaOp) -> ParseResult {
-        let e = self.consume_expr();
-        ~Op1(op, e)
+    pub fn consume_op1(&mut self, op: UnaOp) -> ~Expr {
+        ~Op1(op, self.consume_expr())
     }
 
-    pub fn consume_op2(&mut self, op: BinOp) -> ParseResult {
+    pub fn consume_op2(&mut self, op: BinOp) -> ~Expr {
         let e1 = self.consume_expr();
         let e2 = self.consume_expr();
-
         ~Op2(op, e1, e2)
     }
 
@@ -156,7 +145,6 @@ impl<'self> Parser<'self> {
             self.next_id += 1;
             num
         };
-
         *id
     }
 
@@ -183,14 +171,6 @@ impl<'self> Parser<'self> {
 mod tests {
     use super::*;
     use program::*;
-
-    #[test]
-    fn test_is_eof() {
-        let mut p = Parser::new(" ");
-        assert!(!p.is_eof());
-        p.skip_ws();
-        assert!(p.is_eof());
-    }
 
     #[test]
     fn test_skip_ws() {
