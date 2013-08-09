@@ -22,12 +22,19 @@ pub mod compile;
 
 fn main() {
     let args = os::args();
-    if args.len() != 2 {
+    if args.len() < 2 {
         println("usage: squiggle COMMAND");
         return;
     }
     match args[1] {
         ~"status" => status(),
+        ~"train" => {
+            if args.len() != 3 {
+                println("error: missing training size");
+            } else {
+                train(FromStr::from_str(args[2]).expect("bad size"));
+            }
+        }
         ~"problems" => problems(),
         _ => println("error: unknown command"),
     }
@@ -36,6 +43,12 @@ fn main() {
 fn status() {
     let status = WebApi::new().get_status_blocking();
     println(status.to_str());
+}
+
+fn train(size: u8) {
+    // TODO generate training problems of given size, eval, and guess in a loop
+    // let mut api = WebApi::new();
+    // let prob = api.get_training_blocking();
 }
 
 fn problems() {
