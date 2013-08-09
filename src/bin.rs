@@ -9,9 +9,10 @@ use webapi::{Request, TrainOperators, Empty};
 use program::*;
 use eval::Eval;
 
-pub mod webapi;
-pub mod program;
 pub mod eval;
+pub mod gen;
+pub mod program;
+pub mod webapi;
 
 fn main() {
     // let status = webapi::Request::get_status();
