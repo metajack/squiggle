@@ -4,6 +4,8 @@ use std::cell::Cell;
 use std::comm;
 use std::io::ReaderUtil;
 use std::run::{Process, ProcessOptions};
+use std::rt::rtio::RtioTimer;
+use std::rt::io::Timer;
 use std::str;
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
@@ -33,24 +35,149 @@ impl WebApi {
     fn run(port: Port<Request>) {
         let mut running = true;
         let mut last_req = 0;
+        let timer = Timer::new().unwrap();
         while running {
             match port.try_recv() {
                 None => running = false,
                 Some(req) => {
+                    timer.sleep(5);
+                    dispatch(req);
                 }
             }
 
             last_req = time::precise_time_ns();
         }
     }
+
+    pub fn get_status(&mut self) -> Port<StatusResponse> {
+        let (port, chan) = comm::stream();
+        (**self).send(Status(chan));
+        port
+    }
+
+    pub fn get_status_blocking(&mut self) -> StatusResponse {
+        let port = self.get_status();
+        port.recv()
+    }
+
+    pub fn get_problems(&mut self) -> Port<~[RealProblem]> {
+        let (port, chan) = comm::stream();
+        (**self).send(Problems(chan));
+        port
+    }
+
+    pub fn get_problems_blocking(&mut self) -> ~[RealProblem] {
+        let port = self.get_problems();
+        port.recv()
+    }
+
+    pub fn eval(&mut self, problem: RealProblem, inputs: ~[u64]) -> Port<Option<~[u64]>> {
+        let (port, chan) = comm::stream();
+        (**self).send(Eval(problem, inputs, chan));
+        port
+    }
+
+    pub fn eval_blocking(&mut self, problem: RealProblem, inputs: ~[u64]) -> Option<~[u64]> {
+        let port = self.eval(problem, inputs);
+        port.recv()
+    }
+}
+
+fn dispatch(req: Request) {
+    match req {
+        Status(ref resp_chan)  => {
+            let response = get_request(req.to_url());
+            resp_chan.send(StatusResponse(response));
+        }
+        Train(size, ops, ref resp_chan) => {
+            let response = post_request(req.to_url(), req.to_json_str());
+
+            match *response {
+                Object(obj) => {
+                    let challenge = get_json_str(obj, ~"challenge");
+                    let id = get_json_str(obj, ~"id");
+                    let size = get_json_num(obj, ~"size");
+
+                    let array = get_json_array(obj, ~"operators");
+                    let mut ops = OperatorSet::new();
+                    let str_ops: ~[~str] = do array.iter().transform |op| {
+                        match *op {
+                            String(ref s) => s.clone(),
+                            _ => fail!("bad value in 'operators'"),
+                        }
+                    }.collect();
+                    ops.add(str_ops);
+
+                    resp_chan.send(TrainProblem {
+                        challenge: challenge,
+                        id: id,
+                        size: size as u8,
+                        operators: ops,
+                    });
+                }
+                _ => fail!("bad response"),
+            }
+        }
+        Problems(resp_chan) => {
+            let response = match get_request(make_url("myproblems")) {
+                ~List(a) => a,
+                _ => fail!("bad myproblems response")
+            };
+
+            let probs = do response.consume_iter().transform |x| {
+                match x {
+                    Object(resp) => {
+                        let id = get_json_str(resp, ~"id");
+                        let size = get_json_num(resp, ~"size");
+
+                        let solved = match resp.find(&~"solved")  {
+                            Some(&Boolean(x)) => x,
+                            None => false,
+                            _ => fail!("invalid solved boolean"),
+                        };
+
+                        let time_left = do resp.find(&~"timeLeft").map |tl| {
+                            match **tl {
+                                Number(x) => x,
+                                _ => fail!("invalid timeLeft number")
+                            }
+                        };
+                        let array = get_json_array(resp, ~"operators");
+                        let mut ops = OperatorSet::new();
+                        let str_ops = do array.iter().transform |op| {
+                            match *op {
+                                String(ref s) => s.clone(),
+                                _ => fail!("bad value in 'operators'"),
+                            }
+                        }.collect();
+                        ops.add(str_ops);
+
+                        RealProblem {
+                            id: id,
+                            size: size as u8,
+                            solved: solved,
+                            time_left: time_left,
+                            operators: ops
+                        }
+                    }
+                    _ => fail!("invalid response")
+                }
+            }.collect();
+
+            resp_chan.send(probs);
+        }
+        Eval(prob, inputs, resp_chan) => resp_chan.send(prob.eval(inputs)),
+    }
 }
 
 enum Request {
-    Status,
-    Train { size: u8, operators: TrainOperators },
+    Status(Chan<StatusResponse>),
+    Train(u8, TrainOperator, Chan<TrainProblem>),
+    Problems(Chan<~[RealProblem]>),
+    Eval(RealProblem, ~[u64], Chan<Option<~[u64]>>),
 }
 
-pub enum TrainOperators {
+pub enum TrainOperator {
     Empty,
     Tfold,
     Fold,
@@ -59,18 +186,19 @@ pub enum TrainOperators {
 impl Request {
     pub fn to_url(&self) -> ~str {
         match *self {
-            Status => {
+            Status(*) => {
                 make_url("status")
             }
-            Train { _ } => {
+            Train(*) => {
                 make_url("train")
             }
+            _ => fail!("unsupported to_url kind"),
         }
     }
 
     pub fn to_json_str(&self) -> ~str {
         match *self {
-            Train { size: size, operators: ref ops } => {
+            Train(size, ref ops, _) => {
                 let mut obj: TreeMap<~str, Json> = TreeMap::new();
                 obj.insert(~"size", size.to_json());
                 obj.insert(~"operators", match *ops {
@@ -83,89 +211,6 @@ impl Request {
             _ => fail!(~"not implemented"),
         }
     }
-
-    pub fn get_status() -> StatusResponse {
-        let response = get_request(Status.to_url());
-        StatusResponse(response)
-    }
-
-    pub fn get_training_problem(size: u8, operators: TrainOperators) -> TrainingProblem {
-        let req = Train { size: size, operators: operators };
-        let response = post_request(req.to_url(), req.to_json_str());
-
-        match *response {
-            Object(obj) => {
-                let challenge = get_json_str(obj, ~"challenge");
-                let id = get_json_str(obj, ~"id");
-                let size = get_json_num(obj, ~"size");
-
-                let array = get_json_array(obj, ~"operators");
-                let mut ops = OperatorSet::new();
-                let str_ops: ~[~str] = do array.iter().transform |op| {
-                    match *op {
-                        String(ref s) => s.clone(),
-                        _ => fail!("bad value in 'operators'"),
-                    }
-                }.collect();
-                ops.add(str_ops);
-
-                TrainingProblem {
-                    challenge: challenge,
-                    id: id,
-                    size: size as u8,
-                    operators: ops,
-                }
-            }
-            _ => fail!("bad response"),
-        }
-    }
-
-    pub fn get_real_problems() -> ~[RealProblem] {
-        let response = match get_request(make_url("myproblems")) {
-            ~List(a) => a,
-            _ => fail!("bad myproblems response")
-        };
-
-        do response.consume_iter().transform |x| {
-            match x {
-                Object(resp) => {
-                    let id = get_json_str(resp, ~"id");
-                    let size = get_json_num(resp, ~"size");
-
-                    let solved = match resp.find(&~"solved")  {
-                        Some(&Boolean(x)) => x,
-                        None => false,
-                        _ => fail!("invalid solved boolean"),
-                    };
-
-                    let time_left = do resp.find(&~"timeLeft").map |tl| {
-                        match **tl {
-                            Number(x) => x,
-                            _ => fail!("invalid timeLeft number")
-                        }
-                    };
-                    let array = get_json_array(resp, ~"operators");
-                    let mut ops = OperatorSet::new();
-                    let str_ops = do array.iter().transform |op| {
-                        match *op {
-                            String(ref s) => s.clone(),
-                            _ => fail!("bad value in 'operators'"),
-                        }
-                    }.collect();
-                    ops.add(str_ops);
-
-                    RealProblem {
-                        id: id,
-                        size: size as u8,
-                        solved: solved,
-                        time_left: time_left,
-                        operators: ops
-                    }
-                }
-                _ => fail!("invalid response")
-            }
-        }.collect()
-    }
 }
 
 struct StatusResponse(~Json);
@@ -176,14 +221,14 @@ impl ToStr for StatusResponse {
     }
 }
 
-pub struct TrainingProblem {
+pub struct TrainProblem {
     challenge: ~str,
     id: ~str,
     size: u8,
     operators: OperatorSet,
 }
 
-impl WebEval for TrainingProblem {
+impl WebEval for TrainProblem {
     fn get_id(&self) -> ~str {
         self.id.to_owned()
     }

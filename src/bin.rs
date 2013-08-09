@@ -36,12 +36,13 @@ fn main() {
 }
 
 fn status() {
-    let status = Request::get_status();
+    let status = WebApi::new().get_status_blocking();
     println(status.to_str());
 }
 
 fn problems() {
-    let probs = Request::get_real_problems();
+    let mut api = WebApi::new();
+    let probs = api.get_problems_blocking();
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter()
         .filter(|p| !p.solved && p.time_left.map_default(true, |&n| n > 0.0))
         .collect();
@@ -56,7 +57,7 @@ fn problems() {
             tests.push(rng.gen::<u64>());
         }
 
-        let constraints = prob.eval(tests).expect("coulnd't eval tests");
+        let constraints = api.eval_blocking(prob.clone(), tests.clone()).expect("coulnd't eval tests");
         let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
 
         let mut gen = NaiveGen::new(prob.size, prob.operators, pairs);
