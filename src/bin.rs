@@ -44,7 +44,7 @@ fn main() {
 
 fn status() {
     let status = WebApi::new().get_status_blocking();
-    println(status.to_str());
+    printfln!("%?", status);
 }
 
 fn train(size: u8, operator: TrainOperator) {

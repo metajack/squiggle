@@ -109,7 +109,7 @@ fn dispatch(req: Request) {
     match req {
         Status(ref resp_chan)  => {
             let response = get_request(req.to_url());
-            resp_chan.send(StatusResponse(response));
+            resp_chan.send(StatusResponse::from_json(response));
         }
         Train(_, _, ref resp_chan) => {
             let response = post_request(req.to_url(), req.to_json_str());
@@ -241,11 +241,85 @@ impl Request {
     }
 }
 
-struct StatusResponse(~Json);
+struct StatusResponse {
+    easy_chair_id: ~str,
+    contest_score: float,
+    lightning_score: float,
+    training_score: float,
+    mismatches: float,
+    num_requests: float,
+    cpu_total_time: float,
+    request_window: Window,
+    cpu_window: Window,
+}
 
-impl ToStr for StatusResponse {
-    pub fn to_str(&self) -> ~str {
-        json::to_pretty_str(**self)
+struct Window {
+    resets_in: float,
+    amount: float,
+    limit: float,
+}
+
+impl Window {
+    pub fn from_json(data: &Json) -> Window {
+        match *data {
+            Object(ref obj) => {
+                let resets_in = get_json_num(*obj, ~"resetsIn");
+                let amount = get_json_num(*obj, ~"amount");
+                let limit = get_json_num(*obj, ~"limit");
+
+                Window {
+                    resets_in: resets_in,
+                    amount: amount,
+                    limit: limit,
+                }
+            }
+            _ => fail!("unexpected data"),
+        }
+    }
+}
+
+impl StatusResponse {
+    pub fn from_json(data: &Json) -> StatusResponse {
+        match *data {
+            Object(ref obj) => {
+                let easy_chair_id = get_json_str(*obj, ~"easyChairId");
+                let contest_score = get_json_num(*obj, ~"contestScore");
+                let lightning_score = get_json_num(*obj, ~"lightningScore");
+                let training_score = get_json_num(*obj, ~"trainingScore");
+                let mismatches = get_json_num(*obj, ~"mismatches");
+                let num_requests = get_json_num(*obj, ~"numRequests");
+                let cpu_total_time = get_json_num(*obj, ~"cpuTotalTime");
+                
+                let request_window = match obj.find(&~"requestWindow") {
+                    Some(win_data) => Window::from_json(win_data),
+                    _ => fail!("bad requestWindow"),
+                };
+                let cpu_window = match obj.find(&~"cpuWindow") {
+                    Some(win_data) => Window::from_json(win_data),
+                    _ => fail!("bad cpuWindow"),
+                };
+
+                StatusResponse {
+                    easy_chair_id: easy_chair_id,
+                    contest_score: contest_score,
+                    lightning_score: lightning_score,
+                    training_score: training_score,
+                    mismatches: mismatches,
+                    num_requests: num_requests,
+                    cpu_total_time: cpu_total_time,
+                    request_window: request_window,
+                    cpu_window: cpu_window,
+                }
+            }
+            _ => fail!("unexpected data"),
+        }
+    }
+
+    pub fn score_report(&self) {
+        printfln!("contest: %u \t lightning: %u \t training: %u",
+                  self.contest_score as uint,
+                  self.lightning_score as uint,
+                  self.training_score as uint);
     }
 }
 
