@@ -5,6 +5,8 @@
 extern mod std;
 extern mod extra;
 
+pub mod webapi;
+
 fn main() {
     println("hello, world");
 }
