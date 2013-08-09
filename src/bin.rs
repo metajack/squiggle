@@ -5,6 +5,7 @@
 extern mod std;
 extern mod extra;
 
+use std::rand::RngUtil;
 use eval::Eval;
 use gen::*;
 use program::*;
@@ -44,4 +45,28 @@ fn main() {
         printfln!(gen.gen_prog().to_str());
         gen.reset();
     }
+
+    let prog = Program::new(~"x", ~Op2(Plus, ~Ident(~"x"), ~Ident(~"x")));
+    printfln!("matching against %s", prog.to_str());
+    println(find_matching(&prog).to_str());
+}
+
+fn find_matching(match_against: &Program) -> Program {
+    let mut rng = std::rand::task_rng();
+
+    for i in std::iterator::count(0u, 1) {
+        let mut gen = NaiveGen::new();
+        let prog = gen.gen_prog();
+
+        // say that if it matches on 10000 random numbers, then it's a
+        // proper match.
+        if range(0, 10000).all(|_|  {
+                let i = rng.gen();
+                prog.eval(i) == match_against.eval(i)
+            }) {
+            printfln!("checked %u programs", i);
+            return prog;
+        }
+    }
+    fail!()
 }

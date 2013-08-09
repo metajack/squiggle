@@ -1,7 +1,7 @@
 use program::*;
 
 use std::num::ToStrRadix;
-use std::rand::{Rng, RngUtil, XorShiftRng};
+use std::rand::{Rng, RngUtil, IsaacRng, IsaacRng};
 
 pub trait Generator {
     pub fn gen_sym(&mut self) -> ~str;
@@ -18,7 +18,7 @@ struct ScopeStack {
 }
 
 pub struct NaiveGen {
-    rng: XorShiftRng,
+    rng: IsaacRng,
     scopes: ScopeStack,
     next_symbol: u8,
 }
@@ -26,7 +26,7 @@ pub struct NaiveGen {
 impl NaiveGen {
     pub fn new() -> NaiveGen {
         NaiveGen {
-            rng: XorShiftRng::new(),
+            rng: IsaacRng::new(),
             scopes: ScopeStack {
                 stack: ~[],
             },
