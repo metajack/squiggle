@@ -68,34 +68,25 @@ fn main() {
     let probs = Request::get_real_problems();
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter().filter(|p| !p.solved).collect();
     sort::tim_sort(unsolved_probs);
-    let prob = unsolved_probs.head();
 
-    printfln!("attempting problem %s (%u)", prob.id, prob.size as uint);
+    for prob in unsolved_probs.iter() {
+        printfln!("attempting problem %s (%u)", prob.id, prob.size as uint);
 
-    // // generate tests for /eval
-    // let mut rng = std::rand::task_rng();
-    // let mut tests = ~[];
-    // for _ in range(0, 50) {
-    //     tests.push(rng.gen::<u64>());
-    // }
+        let mut rng = std::rand::task_rng();
+        let mut tests = ~[];
+        for _ in range(0, 50) {
+            tests.push(rng.gen::<u64>());
+        }
 
-    // let constraints = prob.eval(tests).expect("couldn't eval tests");
+        let constraints = prob.eval(tests).expect("coulnd't eval tests");
+        let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
 
-    // let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
+        let mut gen = NaiveGen::new(prob.size, prob.operators, pairs);
 
-    // let mut ops = ~std::hashmap::HashSet::new();
-    // // HashSet isn't clonable(!?), so just swap in a new one, to avoid
-    // // partially moving `prob`
-    // std::util::swap(&mut prob.operators, &mut ops);
-    // let mut gen = NaiveGen::new(prob.size, ops, pairs);
-    // // TODO turn NaiveGen into an iterator:
-    // //   for candidate in program_gen() {
-    // //       ...
-    // //   }
-
-    // let candidate = gen.next();
-    // println(candidate.to_str());
-    // printfln!(prob.guess(candidate.to_str()))
+        let candidate = gen.next();
+        println(candidate.to_str());
+        printfln!(prob.guess(candidate.to_str()))
+    }
 }
 
 fn find_matching(match_against: &Program) -> ~Program {
