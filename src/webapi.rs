@@ -7,6 +7,7 @@ use std::run::{Process, ProcessOptions};
 use std::rt::rtio::RtioTimer;
 use std::rt::io::timer::Timer;
 use std::str;
+use std::task;
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
 use extra::json;
@@ -25,7 +26,7 @@ impl WebApi {
         let (port, chan) = comm::stream();
 
         let port = Cell::new(port);
-        do spawn {
+        do task::spawn_sched(task::SingleThreaded) {
             WebApi::run(port.take());
         }
 
@@ -34,17 +35,35 @@ impl WebApi {
 
     fn run(port: Port<Request>) {
         let mut running = true;
-        let mut last_req = 0;
         let timer = Timer::new().unwrap();
 
         let status = StatusResponse::from_json(get_request(make_url("status")));
+        let mut req_win = status.request_window;
+        let mut last_reset = time::precise_time_ns();
 
         while running {
             match port.try_recv() {
                 None => running = false,
                 Some(req) => {
-                    timer.sleep(3500);
+                    if req_win.amount >= req_win.limit {
+                        // over request limit, must wait until reset
+                        let elapsed_ms = (time::precise_time_ns() - last_reset) / 1000000;
+                        let ms_to_sleep = (1000f * req_win.resets_in) - (elapsed_ms as float);
+                        if ms_to_sleep > 0f {
+                            timer.sleep(ms_to_sleep as u64);
+                            req_win.resets_in = 20f; // may change, but hardcoded for now
+                            last_reset = time::precise_time_ns();
+                        } else {
+                            // we are past the window, ms_to_sleep is negative
+                            req_win.resets_in = 20f + ms_to_sleep; // may change, but hardcoded for now
+                            last_reset = time::precise_time_ns() + (ms_to_sleep as u64) * 1000000;
+                        }
+                        req_win.amount = 0f;
+                    }
+
                     dispatch(req);
+
+                    req_win.amount += 1f;
                 }
             }
 

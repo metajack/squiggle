@@ -1,5 +1,4 @@
 use program::*;
-use webapi::*;
 
 use std::cell::Cell;
 use std::comm;
