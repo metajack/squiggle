@@ -36,6 +36,9 @@ impl WebApi {
         let mut running = true;
         let mut last_req = 0;
         let timer = Timer::new().unwrap();
+
+        let status = StatusResponse::from_json(get_request(make_url("status")));
+
         while running {
             match port.try_recv() {
                 None => running = false,
@@ -108,13 +111,13 @@ impl WebApi {
 fn dispatch(req: Request) {
     match req {
         Status(ref resp_chan)  => {
-            let response = get_request(req.to_url());
+            let response = get_request(make_url("status"));
             resp_chan.send(StatusResponse::from_json(response));
         }
         Train(_, _, ref resp_chan) => {
-            let response = post_request(req.to_url(), req.to_json_str());
+            let response = post_request(make_url("train"), req.to_json_str());
 
-            match *response {
+            match response {
                 Object(obj) => {
                     let challenge = get_json_str(obj, ~"challenge");
                     let id = get_json_str(obj, ~"id");
@@ -144,7 +147,7 @@ fn dispatch(req: Request) {
         }
         Problems(resp_chan) => {
             let response = match get_request(make_url("myproblems")) {
-                ~List(a) => a,
+                List(a) => a,
                 _ => fail!("bad myproblems response")
             };
 
@@ -212,25 +215,13 @@ pub enum TrainOperator {
 }
 
 impl Request {
-    pub fn to_url(&self) -> ~str {
-        match *self {
-            Status(*) => {
-                make_url("status")
-            }
-            Train(*) => {
-                make_url("train")
-            }
-            _ => fail!("unsupported to_url kind"),
-        }
-    }
-
     pub fn to_json_str(&self) -> ~str {
         match *self {
             Train(size, ref ops, _) => {
                 let mut obj: TreeMap<~str, Json> = TreeMap::new();
                 obj.insert(~"size", size.to_json());
                 obj.insert(~"operators", match *ops {
-                    Empty => (~[~""]).to_json(),
+                    Empty => List(~[]),
                     Tfold => (~[~"tfold"]).to_json(),
                     Fold => (~[~"fold"]).to_json(),
                 });
@@ -260,8 +251,8 @@ struct Window {
 }
 
 impl Window {
-    pub fn from_json(data: &Json) -> Window {
-        match *data {
+    pub fn from_json(data: Json) -> Window {
+        match data {
             Object(ref obj) => {
                 let resets_in = get_json_num(*obj, ~"resetsIn");
                 let amount = get_json_num(*obj, ~"amount");
@@ -279,8 +270,8 @@ impl Window {
 }
 
 impl StatusResponse {
-    pub fn from_json(data: &Json) -> StatusResponse {
-        match *data {
+    pub fn from_json(data: Json) -> StatusResponse {
+        match data {
             Object(ref obj) => {
                 let easy_chair_id = get_json_str(*obj, ~"easyChairId");
                 let contest_score = get_json_num(*obj, ~"contestScore");
@@ -291,11 +282,11 @@ impl StatusResponse {
                 let cpu_total_time = get_json_num(*obj, ~"cpuTotalTime");
                 
                 let request_window = match obj.find(&~"requestWindow") {
-                    Some(win_data) => Window::from_json(win_data),
+                    Some(win_data) => Window::from_json(win_data.clone()),
                     _ => fail!("bad requestWindow"),
                 };
                 let cpu_window = match obj.find(&~"cpuWindow") {
-                    Some(win_data) => Window::from_json(win_data),
+                    Some(win_data) => Window::from_json(win_data.clone()),
                     _ => fail!("bad cpuWindow"),
                 };
 
@@ -371,7 +362,7 @@ trait WebEval {
         let guess_json = obj.to_json().to_str();
 
         let response = match post_request(make_url("guess"), guess_json) {
-            ~Object(o) => o,
+            Object(o) => o,
             _ => fail!("bad guess response")
         };
 
@@ -390,7 +381,7 @@ trait WebEval {
         let eval_json = obj.to_json().to_str();
 
         let response = match post_request(make_url("eval"), eval_json) {
-            ~Object(o) => o,
+            Object(o) => o,
             _ => fail!("bad eval response")
         };
 
@@ -442,27 +433,51 @@ fn make_url(path: &str) -> ~str {
     s
 }
 
-fn get_request(url: ~str) -> ~Json {
-    info!("GET /%s", extract_path(url));
-    let mut p = Process::new("curl", [url], ProcessOptions::new());
-    let output = str::from_bytes(p.output().read_whole_stream());
-    info!("HTTP: %s", output);
-    match json::from_str(output) {
-        Ok(res) => ~res,
-        Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
+fn get_request(url: ~str) -> Json {
+    let mut tries = 5;
+    while tries > 0 {
+        info!("GET /%s", extract_path(url));
+        let mut p = Process::new("curl", [~"-f", url.clone()], ProcessOptions::new());
+        let output = str::from_bytes(p.output().read_whole_stream());
+        let retval = p.finish();
+        info!("HTTP %i: %s", retval, output);
+        if retval == 0 {
+            match json::from_str(output) {
+                Ok(res) => return res,
+                Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
+            }
+        } else {
+            println("WARN: http throttled. retrying");
+            tries -= 1;
+            let timer = Timer::new().unwrap();
+            timer.sleep(4000);
+        }
     }
+    fail!("ran out of retries");
 }
 
-fn post_request(url: ~str, data: ~str) -> ~Json {
-    info!("GET /%s", extract_path(url));
-    info!("DATA: %s", data);
-    let mut p = Process::new("curl", [~"-X", ~"POST", url.clone(), ~"-d", data], ProcessOptions::new());
-    let output = str::from_bytes(p.output().read_whole_stream());
-    info!("HTTP: %s", output);
-    match json::from_str(output) {
-        Ok(res) => ~res,
-        Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
+fn post_request(url: ~str, data: ~str) -> Json {
+    let mut tries = 5;
+    while tries > 0 {
+        info!("POST /%s", extract_path(url));
+        info!("DATA: %s", data);
+        let mut p = Process::new("curl", [~"-X", ~"POST", ~"-f", url.clone(), ~"-d", data.clone()], ProcessOptions::new());
+        let output = str::from_bytes(p.output().read_whole_stream());
+        let retval = p.finish();
+        info!("HTTP %i: %s", retval, output);
+        if retval == 0 {
+            match json::from_str(output) {
+                Ok(res) => return res,
+                Err(e) => fail!(fmt!("error: %s\n%s", e.to_str(), output)),
+            }
+        } else {
+            println("WARN: http throttled. retrying");
+            tries -= 1;
+            let timer = Timer::new().unwrap();
+            timer.sleep(4000);
+        }
     }
+    fail!("ran out of retries");
 }
 
 fn extract_path(url: &str) -> ~str {
