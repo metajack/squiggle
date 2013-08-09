@@ -1,6 +1,7 @@
 use std::hashmap::HashSet;
 use std::run::{Process, ProcessOptions};
 use std::to_str::ToStr;
+use std::num::{FromStrRadix,ToStrRadix};
 use extra::json;
 use extra::json::{Json, ToJson, Object, Number, String, List};
 use extra::treemap::TreeMap;
@@ -105,6 +106,71 @@ pub struct TrainingProblem {
     size: u8,
     operators: ~HashSet<Operator>,
 }
+
+impl WebEval for TrainingProblem {
+    fn get_id(&self) -> ~str {
+        self.id.to_owned()
+    }
+}
+
+enum GuessResult {
+    Win,
+    Mismatch(u64, u64, u64),
+    Error(~str)
+}
+
+pub trait WebEval {
+    fn get_id(&self) -> ~str;
+
+    fn guess(&self, prog: ~str) -> GuessResult {
+        let mut obj: TreeMap<~str, Json> = TreeMap::new();
+        obj.insert(~"id", self.get_id().to_json());
+        obj.insert(~"program", prog.to_json());
+        let guess_json = obj.to_json().to_str();
+
+        let response = match post_request(make_url("guess"), guess_json) {
+            ~Object(o) => o,
+            _ => fail!("bad guess response")
+        };
+
+        match get_json_str(response, ~"status") {
+            ~"win" => Win,
+            ~"mismatch" => fail!(),
+            _ => fail!()
+        }
+    }
+    fn eval(&self, nums: &[u64]) -> Option<~[u64]> {
+        let mut obj: TreeMap<~str, Json> = TreeMap::new();
+        obj.insert(~"id", self.get_id().to_json());
+
+        let args = nums.iter().transform(|i| i.to_str_radix(16)).to_owned_vec();
+        obj.insert(~"arguments", args.to_json());
+        let eval_json = obj.to_json().to_str();
+
+        let response = match post_request(make_url("eval"), eval_json) {
+            ~Object(o) => o,
+            _ => fail!("bad eval response")
+        };
+
+        if "ok" == get_json_str(response, ~"status") {
+            let outs = get_json_array(response, ~"outputs");
+            Some(do outs.iter().transform |j| {
+                    match *j {
+                        String(ref s) => {
+                            let no_0x = s.slice_from(2);
+                            FromStrRadix::from_str_radix::<u64>(no_0x, 16).expect("not a hex number")
+                        }
+                        _ => fail!("non string in eval.outputs")
+                    }
+                }.to_owned_vec())
+        } else {
+            println(get_json_str(response, ~"message"));
+            None
+        }
+    }
+}
+
+
 
 fn get_json_array<'a>(obj: &'a Object, key: ~str) -> ~[Json] {
     match obj.find(&key) {

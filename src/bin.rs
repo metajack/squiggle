@@ -61,7 +61,7 @@ fn main() {
     let status = Request::get_status();
     println(status.to_str());
 
-    let prob = Request::get_training_problem(5, Empty);
+    let mut prob = Request::get_training_problem(5, Empty);
     printfln!("%?", prob);
 
     // generate tests for /eval
@@ -71,15 +71,23 @@ fn main() {
         tests.push(rng.gen::<u64>());
     }
 
-    let constraints = Request::get_eval_results(tests);
-    let mut gen = NaiveGen::new(prob.size, prob.operators, constraints);
+    let constraints = prob.eval(tests).expect("couldn't eval tests");
+
+    let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
+
+    let mut ops = ~std::hashmap::HashSet::new();
+    // HashSet isn't clonable(!?), so just swap in a new one, to avoid
+    // partially moving `prob`
+    std::util::swap(&mut prob.operators, &mut ops);
+    let mut gen = NaiveGen::new(prob.size, ops, pairs);
     // TODO turn NaiveGen into an iterator:
     //   for candidate in program_gen() {
     //       ...
     //   }
+
     let candidate = gen.next();
     println(candidate.to_str());
-    // TODO: guess
+    printfln!(prob.guess(candidate.to_str()))
 }
 
 fn find_matching(match_against: &Program) -> ~Program {
