@@ -1,5 +1,22 @@
+use std::str;
+
+pub type Id = uint;
+
+fn id_to_str(mut num: Id) -> ~str {
+    let mut s = str::with_capacity(5);
+    loop {
+        let (div, rem) = num.div_rem(&26);
+        s.push_char((rem + 97) as char);
+        if div == 0 {
+            break;
+        }
+        num = div;
+    }
+    s
+}
+
 pub struct Program {
-    id: ~str,
+    id: Id,
     expr: ~Expr,
 }
 
@@ -23,21 +40,21 @@ pub enum BinOp {
 pub enum Expr {
     Zero,
     One,
-    Ident(~str),
+    Ident(Id),
     If0(~Expr, ~Expr, ~Expr),
     Op1(UnaOp, ~Expr),
     Op2(BinOp, ~Expr, ~Expr),
     Fold {
         foldee: ~Expr,
         init: ~Expr,
-        next_id: ~str,
-        accum_id: ~str,
+        next_id: Id,
+        accum_id: Id,
         body: ~Expr
     }
 }
 
 impl Program {
-    pub fn new(id: ~str, expr: ~Expr) -> Program {
+    pub fn new(id: Id, expr: ~Expr) -> Program {
         Program {
             id: id,
             expr: expr,
@@ -75,12 +92,7 @@ impl FromStr for Program {
 
 impl ToStr for Program {
     pub fn to_str(&self) -> ~str {
-        let mut program = ~"(lambda (";
-        program.push_str(self.id);
-        program.push_str(") ");
-        program.push_str(self.expr.to_str());
-        program.push_str(")");
-        program
+        fmt!("(lambda (%s) %s)", self.id.to_str(), self.expr.to_str())
     }
 }
 
@@ -112,7 +124,7 @@ impl ToStr for Expr {
         match *self {
             Zero => ~"0",
             One => ~"1",
-            Ident(ref id) => id.clone(),
+            Ident(ref id) => id.to_str(),
             If0(ref test, ref then, ref other) => {
                 let mut e = ~"(if0 ";
                 e.push_str(test.to_str());
@@ -147,7 +159,7 @@ impl ToStr for Expr {
             } => {
                 fmt!("(fold %s %s (lambda (%s %s) %s))",
                      foldee.to_str(), init.to_str(),
-                     *accum_id, *next_id,
+                     accum_id.to_str(), next_id.to_str(),
                      body.to_str())
             }
         }

@@ -3,13 +3,13 @@ use program::*;
 // immutable linked list, lifetime don't work well enough (yet; need
 // the ability for 2 lifetimes) for this to avoid @.
 struct Scope {
-    id: ~str,
+    id: Id,
     val: u64,
     parent: Option<@Scope>
 }
 
 impl Scope {
-    fn push(@self, id: ~str, val: u64) -> @Scope {
+    fn push(@self, id: Id, val: u64) -> @Scope {
         @Scope {
             id: id,
             val: val,
@@ -17,13 +17,13 @@ impl Scope {
         }
     }
 
-    fn lookup(&self, id: &str) -> u64 {
+    fn lookup(&self, id: Id) -> u64 {
         if id == self.id {
             self.val
         } else {
             match self.parent {
                 Some(p) => p.lookup(id),
-                None => fail!("ident %s not found", id)
+                None => fail!("ident %s not found", id.to_str())
             }
         }
     }
@@ -32,7 +32,7 @@ impl Scope {
         match *expr {
             Zero => 0,
             One => 1,
-            Ident(ref s) => self.lookup(*s),
+            Ident(id) => self.lookup(id),
             If0(~ref cond, ~ref then, ~ref els) => {
                 if self.eval(cond) == 0 {
                     self.eval(then)
@@ -64,7 +64,7 @@ impl Scope {
             }
             Fold {
                 foldee: ~ref foldee, init: ~ref init,
-                next_id: ref next_id, accum_id: ref accum_id,
+                next_id: next_id, accum_id: accum_id,
                 body: ~ref body
             } => {
                 let mut foldee = self.eval(foldee);
@@ -74,8 +74,8 @@ impl Scope {
                     let b = foldee & 0xff;
                     foldee >>= 8;
 
-                    let scope = self.push(next_id.clone(), b);
-                    let scope = scope.push(accum_id.clone(), accum);
+                    let scope = self.push(next_id, b);
+                    let scope = scope.push(accum_id, accum);
 
                     accum = scope.eval(body)
                 }
@@ -92,7 +92,7 @@ pub trait Eval {
 impl Eval for Program {
     fn eval(&self, val: u64) -> u64 {
         (@Scope {
-                id: self.id.clone(),
+                id: self.id,
                 val: val,
                 parent: None
             }).eval(self.expr)
@@ -111,8 +111,8 @@ mod test {
     fn bench_eval(bh: &mut BenchHarness) {
         // collection of randomly generated programs
         let progs = [
-                     Program::new(~"gg", ~Op1(Shr1, ~Ident(~"gg"))),
-                     Program::new(~"hg", ~Op1(Shl1, ~Ident(~"hg"))),
+                     Program::new(0, ~Op1(Shr1, ~Ident(0))),
+                     Program::new(0, ~Op1(Shl1, ~Ident(0))),
                      ];
         let mut rng = rand::rng();
 
@@ -128,13 +128,13 @@ mod test {
     #[bench]
     fn bench_eval_fold(bh: &mut BenchHarness) {
         let fold_expr = ~Fold {
-            foldee: ~Ident(~"x"),
+            foldee: ~Ident(0),
             init: ~Zero,
-            next_id: ~"n",
-            accum_id: ~"a",
-            body: ~Op2(Plus, ~Ident(~"n"), ~Ident(~"a"))
+            next_id: 1,
+            accum_id: 2,
+            body: ~Op2(Plus, ~Ident(1), ~Ident(2))
         };
-        let prog = Program::new(~"x", fold_expr);
+        let prog = Program::new(0, fold_expr);
         let mut rng = rand::rng();
 
         do bh.iter {
@@ -145,11 +145,11 @@ mod test {
     #[test]
     fn test_eval() {
         let fold_expr = ~Fold {
-            foldee: ~Ident(~"x"),
+            foldee: ~Ident(0),
             init: ~Zero,
-            next_id: ~"n",
-            accum_id: ~"a",
-            body: ~Op2(Plus, ~Ident(~"n"), ~Ident(~"a"))
+            next_id: 1,
+            accum_id: 2,
+            body: ~Op2(Plus, ~Ident(1), ~Ident(2))
         };
         let fold_fn = |mut x: u64| {
             let mut accum = 0;
@@ -161,23 +161,23 @@ mod test {
         };
 
         let progs_fn: ~[(Program, &fn(u64) -> u64)] = ~[
-                        (Program::new(~"x", ~Zero), |_| 0),
-                        (Program::new(~"x", ~One), |_| 1),
-                        (Program::new(~"x", ~Ident(~"x")), |x| x),
-                        (Program::new(~"x", ~Op1(Not, ~Ident(~"x"))), |x| !x),
-                        (Program::new(~"x", ~Op1(Shl1, ~Ident(~"x"))), |x| x << 1),
-                        (Program::new(~"x", ~Op1(Shr1, ~Ident(~"x"))), |x| x >> 1),
-                        (Program::new(~"x", ~Op1(Shr4, ~Ident(~"x"))), |x| x >> 4),
-                        (Program::new(~"x", ~Op1(Shr16, ~Ident(~"x"))), |x| x >> 16),
-                        (Program::new(~"x", ~Op2(And, ~Ident(~"x"), ~One)), |x| x & 1),
-                        (Program::new(~"x", ~Op2(Or, ~Ident(~"x"), ~One)), |x| x | 1),
-                        (Program::new(~"x", ~Op2(Xor, ~Ident(~"x"), ~One)), |x| x ^ 1),
-                        (Program::new(~"x", ~Op2(Plus, ~Ident(~"x"), ~One)), |x| x + 1),
-                        (Program::new(~"x", ~If0(~Ident(~"x"), ~One, ~Zero)),
+                        (Program::new(0, ~Zero), |_| 0),
+                        (Program::new(0, ~One), |_| 1),
+                        (Program::new(0, ~Ident(0)), |x| x),
+                        (Program::new(0, ~Op1(Not, ~Ident(0))), |x| !x),
+                        (Program::new(0, ~Op1(Shl1, ~Ident(0))), |x| x << 1),
+                        (Program::new(0, ~Op1(Shr1, ~Ident(0))), |x| x >> 1),
+                        (Program::new(0, ~Op1(Shr4, ~Ident(0))), |x| x >> 4),
+                        (Program::new(0, ~Op1(Shr16, ~Ident(0))), |x| x >> 16),
+                        (Program::new(0, ~Op2(And, ~Ident(0), ~One)), |x| x & 1),
+                        (Program::new(0, ~Op2(Or, ~Ident(0), ~One)), |x| x | 1),
+                        (Program::new(0, ~Op2(Xor, ~Ident(0), ~One)), |x| x ^ 1),
+                        (Program::new(0, ~Op2(Plus, ~Ident(0), ~One)), |x| x + 1),
+                        (Program::new(0, ~If0(~Ident(0), ~One, ~Zero)),
                          |x| if x == 0 {1} else {0}),
-                        (Program::new(~"x", ~If0(~Zero, ~One, ~Zero)), |_| 1),
-                        (Program::new(~"x", ~If0(~One, ~One, ~Zero)), |_| 0),
-                        (Program::new(~"x", fold_expr), fold_fn),
+                        (Program::new(0, ~If0(~Zero, ~One, ~Zero)), |_| 1),
+                        (Program::new(0, ~If0(~One, ~One, ~Zero)), |_| 0),
+                        (Program::new(0, fold_expr), fold_fn),
                         ];
 
         for (p, f) in progs_fn.consume_iter() {

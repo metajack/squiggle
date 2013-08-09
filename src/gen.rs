@@ -8,11 +8,11 @@ use std::rand::{Rng, RngUtil, IsaacRng};
 use std::str;
 
 pub trait Generator {
-    pub fn gen_sym(&mut self) -> ~str;
+    pub fn gen_sym(&mut self) -> Id;
     pub fn gen_expr(&mut self) -> Expr;
     pub fn gen_prog(&mut self) -> Program;
 
-    pub fn get_sym(&mut self) -> ~str;
+    pub fn get_sym(&mut self) -> Id;
 }
 
 pub enum GenMsg {
@@ -21,7 +21,7 @@ pub enum GenMsg {
     Exit,
 }
 
-type Scope = ~[~str];
+type Scope = ~[Id];
 
 struct ScopeStack {
     stack: ~[Scope],
@@ -121,20 +121,10 @@ impl NaiveGenState {
 }
 
 impl Generator for NaiveGenState {
-    pub fn gen_sym(&mut self) -> ~str {
+    pub fn gen_sym(&mut self) -> Id {
         let mut num = self.next_symbol;
         self.next_symbol += 1;
-
-        let mut id = ~[];
-        loop {
-            let (div, rem) = num.div_rem(&26);
-            id.push(rem + 97 as u8);
-            if div == 0 {
-                break;
-            }
-            num = div;
-        }
-        str::from_bytes(id)
+        num as uint
     }
 
     pub fn gen_expr(&mut self) -> Expr {
@@ -222,7 +212,7 @@ impl Generator for NaiveGenState {
         ret
     }
 
-    pub fn get_sym(&mut self) -> ~str {
+    pub fn get_sym(&mut self) -> Id {
         let syms = self.scopes.stack.concat_vec();
         self.rng.choose(syms)
     }
