@@ -159,28 +159,33 @@ impl Generator for NaiveGenState {
                     loop;
                 }
                 4 => { // op1
-                    // TODO: constrain against operators
                     if self.size + 2 <= self.max_size {
-                        self.size += 1;
-                        let op = self.rng.gen();
-                        let expr = self.gen_expr();
-                        return Op1(op, ~expr);
+                        let op: UnaOp = self.rng.gen();
+                        if op.in_ops(&self.operations) {
+                            self.size += 1;
+                            let expr = self.gen_expr();
+                            return Op1(op, ~expr);
+                        }
                     }
                     loop;
                 }
                 5 => { // op2
-                    // TODO: constraint against operators
                     if self.size + 3 <= self.max_size {
-                        let op = self.rng.gen();
-                        let left = self.gen_expr();
-                        let right = self.gen_expr();
-                        return Op2(op, ~left, ~right);
+                        let op: BinOp = self.rng.gen();
+                        if op.in_ops(&self.operations) {
+                            self.size += 1;
+                            let left = self.gen_expr();
+                            let right = self.gen_expr();
+                            return Op2(op, ~left, ~right);
+                        }
                     }
                     loop;
                 }
                 6 => { // fold
-                    // TODO: constrain against operators
-                    if self.size + 5 <= self.max_size {
+                    // TODO: constrain against tfold
+                    let op_ok = self.operations.fold;
+                    if op_ok && self.size + 5 <= self.max_size {
+                        self.size += 2;
                         let foldee = self.gen_expr();
                         let init = self.gen_expr();
                         let next_id = self.gen_sym();

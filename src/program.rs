@@ -1,5 +1,4 @@
 use std::str;
-
 pub type Id = uint;
 
 fn id_to_str(mut num: Id) -> ~str {
@@ -13,6 +12,77 @@ fn id_to_str(mut num: Id) -> ~str {
         num = div;
     }
     s
+}
+
+pub struct OperatorSet {
+    op1: [bool, ..5],
+    op2: [bool, ..4],
+    if0: bool,
+    fold: bool,
+    tfold: bool,
+}
+
+impl OperatorSet {
+    pub fn new() -> OperatorSet {
+        OperatorSet {
+            op1: [false, false, false, false, false],
+            op2: [false, false, false, false],
+            if0: false,
+            fold: false,
+            tfold: false,
+        }
+    }
+
+    pub fn add(&mut self, ops: ~[~str]) {
+        for op in ops.iter() {
+            match *op {
+                ~"not" => self.op1[OP_NOT] = true,
+                ~"shl1" => self.op1[OP_SHL1] = true,
+                ~"shr1" => self.op1[OP_SHR1] = true,
+                ~"shr4" => self.op1[OP_SHR4] = true,
+                ~"shr16" => self.op1[OP_SHR16] = true,
+                ~"and" => self.op2[OP_AND] = true,
+                ~"or" => self.op2[OP_OR] = true,
+                ~"xor" => self.op2[OP_XOR] = true,
+                ~"plus" => self.op2[OP_PLUS] = true,
+                ~"if0" => self.if0 = true,
+                ~"fold" => self.fold = true,
+                ~"tfold" => self.tfold = true,
+                _ => fail!("bad operation"),
+            }
+        }
+    }
+}
+
+impl Clone for OperatorSet {
+    pub fn clone(&self) -> OperatorSet {
+        let mut ops = OperatorSet::new();
+        for i in range(0, 5) {
+            ops.op1[i] = self.op1[i];
+            if i != 4 {
+                ops.op2[i] = self.op2[i];
+            }
+        }
+        ops.if0 = self.if0;
+        ops.fold = self.fold;
+        ops.tfold = self.tfold;
+        ops
+    }
+}
+
+impl Eq for OperatorSet {
+    pub fn eq(&self, other: &OperatorSet) -> bool {
+        for i in range(0, 5) {
+            if other.op1[i] != self.op1[i] { return false; }
+            if i != 4 {
+                if other.op2[i] != self.op2[i] { return false; }
+            }
+        }
+        if other.if0 != self.if0 { return false; }
+        if other.fold != self.fold { return false; }
+        if other.tfold != self.tfold { return false; }
+        true
+    }
 }
 
 #[deriving(Eq)]
@@ -36,6 +106,18 @@ pub enum UnaOp {
     Shr16,
 }
 
+impl UnaOp {
+    fn in_ops(&self, ops: &OperatorSet) -> bool {
+        match *self {
+            Not => ops.op1[OP_NOT],
+            Shl1 => ops.op1[OP_SHL1],
+            Shr1 => ops.op1[OP_SHR1],
+            Shr4 => ops.op1[OP_SHR4],
+            Shr16 => ops.op1[OP_SHR16],
+        }
+    }
+}
+
 pub static OP_AND: uint = 0;
 pub static OP_OR: uint = 1;
 pub static OP_XOR: uint = 2;
@@ -47,6 +129,17 @@ pub enum BinOp {
     Or,
     Xor,
     Plus,
+}
+
+impl BinOp {
+    fn in_ops(&self, ops: &OperatorSet) -> bool {
+        match *self {
+            And => ops.op2[OP_AND],
+            Or => ops.op2[OP_OR],
+            Xor => ops.op2[OP_XOR],
+            Plus => ops.op2[OP_PLUS],
+        }
+    }
 }
 
 #[deriving(Eq)]
