@@ -1,10 +1,11 @@
-use std::rand::{Rand, Rng};
+use std::rand::Rand;
 
 pub struct Program {
     id: ~str,
     expr: ~Expr,
 }
 
+#[deriving(Rand)]
 pub enum UnaOp {
     Not,
     Shl1,
@@ -13,6 +14,7 @@ pub enum UnaOp {
     Shr16,
 }
 
+#[deriving(Rand)]
 pub enum BinOp {
     And,
     Or,
@@ -151,11 +153,5 @@ impl ToStr for Expr {
                      body.to_str())
             }
         }
-    }
-}
-
-impl Rand for Expr {
-    pub fn rand<R: Rng>(rng: &mut R) -> Expr {
-        Zero
     }
 }

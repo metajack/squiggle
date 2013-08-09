@@ -5,9 +5,10 @@
 extern mod std;
 extern mod extra;
 
-use webapi::{Request, TrainOperators, Empty};
-use program::*;
 use eval::Eval;
+use gen::*;
+use program::*;
+use webapi::{Request, TrainOperators, Empty};
 
 pub mod eval;
 pub mod gen;
@@ -36,4 +37,11 @@ fn main() {
         });
 
     printfln!(prog.eval(0x1122334455667788))
+
+    // some random programs
+    let mut gen = NaiveGen::new();
+    for _ in range(0, 5) {
+        printfln!(gen.gen_prog().to_str());
+        gen.reset();
+    }
 }
