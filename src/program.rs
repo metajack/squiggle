@@ -21,6 +21,12 @@ pub struct Program {
     expr: ~Expr,
 }
 
+pub static OP_NOT: uint = 0;
+pub static OP_SHL1: uint = 1;
+pub static OP_SHR1: uint = 2;
+pub static OP_SHR4: uint = 3;
+pub static OP_SHR16: uint = 4;
+
 #[deriving(Rand,Eq,IterBytes)]
 pub enum UnaOp {
     Not,
@@ -30,41 +36,17 @@ pub enum UnaOp {
     Shr16,
 }
 
+pub static OP_AND: uint = 0;
+pub static OP_OR: uint = 1;
+pub static OP_XOR: uint = 2;
+pub static OP_PLUS: uint = 3;
+
 #[deriving(Rand,Eq,IterBytes)]
 pub enum BinOp {
     And,
     Or,
     Xor,
     Plus,
-}
-
-#[deriving(Eq,IterBytes)]
-pub enum Operator {
-    Operator_Op1(UnaOp),
-    Operator_Op2(BinOp),
-    Operator_TFold,
-    Operator_Fold,
-    Operator_If0
-}
-
-impl FromStr for Operator {
-    fn from_str(s: &str) -> Option<Operator> {
-        match s {
-            "not" => Some(Operator_Op1(Not)),
-            "shl1" => Some(Operator_Op1(Shl1)),
-            "shr1" => Some(Operator_Op1(Shr1)),
-            "shr4" => Some(Operator_Op1(Shr4)),
-            "shr16" => Some(Operator_Op1(Shr16)),
-            "and" => Some(Operator_Op2(And)),
-            "or" => Some(Operator_Op2(Or)),
-            "xor" => Some(Operator_Op2(Xor)),
-            "plus" => Some( Operator_Op2(Plus)),
-            "if0" => Some(Operator_If0),
-            "fold" => Some(Operator_Fold),
-            "tfold" => Some(Operator_TFold),
-            _ => None
-        }
-    }
 }
 
 #[deriving(Eq)]

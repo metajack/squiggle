@@ -1,9 +1,9 @@
 use program::*;
+use webapi::*;
 
 use std::cell::Cell;
 use std::comm;
 use std::comm::{Port, Chan};
-use std::hashmap::HashSet;
 use std::rand::{Rng, RngUtil, IsaacRng};
 use std::vec;
 
@@ -16,7 +16,7 @@ pub trait Generator {
 }
 
 pub enum GenMsg {
-    Reset(u8, ~HashSet<Operator>, ~[(u64, u64)]),
+    Reset(u8, OperatorSet, ~[(u64, u64)]),
     Generate(Chan<~Program>),
     MoreConstraints(~[(u64,u64)]),
     Exit,
@@ -29,13 +29,13 @@ pub struct NaiveGenState {
     scope_stack: ~[Id],
     next_symbol: u8,
     max_size: u8,
-    operations: ~HashSet<Operator>,
+    operations: OperatorSet,
     constraints: ~[(u64, u64)],
     size: u8,
 }
 
 impl NaiveGen {
-    pub fn new(max_size: u8, operations: ~HashSet<Operator>,
+    pub fn new(max_size: u8, operations: OperatorSet,
                constraints: ~[(u64, u64)]) -> NaiveGen {
         let (port, chan) = comm::stream();
 
@@ -50,7 +50,7 @@ impl NaiveGen {
 
     // FIXME: this isn't right anymore. maybe it's not needed
     pub fn reset(&mut self) {
-        (**self).send(Reset(30, ~HashSet::new(), ~[]));
+        (**self).send(Reset(30, OperatorSet::new(), ~[]));
     }
 
     pub fn next(&mut self) -> ~Program {
@@ -85,7 +85,7 @@ impl NaiveGen {
                                 loop 'newprog;
                             }
                         }
-                        // printfln!("genned constrained prog in %u iters", i);
+                        printfln!("genned constrained prog in %u iters", i);
                         chan.send(~prog);
                         break;
                     }
@@ -102,13 +102,13 @@ impl NaiveGenState {
             scope_stack: vec::with_capacity(100),
             next_symbol: 0,
             max_size: 30,
-            operations: ~HashSet::new(),
+            operations: OperatorSet::new(),
             constraints: ~[],
             size: 0,
         }
     }
 
-    pub fn reset(&mut self, max_size: u8, operations: ~HashSet<Operator>, constraints: ~[(u64, u64)]) {
+    pub fn reset(&mut self, max_size: u8, operations: OperatorSet, constraints: ~[(u64, u64)]) {
         assert!(max_size >= 3 && max_size <= 30);
         self.scope_stack.clear();
         self.next_symbol = 0;
@@ -143,7 +143,7 @@ impl Generator for NaiveGenState {
                     return Ident(self.get_sym());
                 }
                 3 => { // if0
-                    let op_ok = self.operations.contains(&Operator_If0);
+                    let op_ok = self.operations.if0;
                     if op_ok && self.size + 4 <= self.max_size {
                         self.size += 1;
                         let test = self.gen_expr();

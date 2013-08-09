@@ -1,11 +1,11 @@
-use std::hashmap::HashSet;
+use program::*;
+
 use std::run::{Process, ProcessOptions};
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
 use extra::json;
 use extra::json::{Json, ToJson, Object, Number, String, List, Boolean};
 use extra::treemap::TreeMap;
-use program::Operator;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
@@ -66,14 +66,14 @@ impl Request {
                 let size = get_json_num(obj, ~"size");
 
                 let array = get_json_array(obj, ~"operators");
-                let ops = ~do array.iter().transform |op| {
+                let mut ops = OperatorSet::new();
+                let str_ops: ~[~str] = do array.iter().transform |op| {
                     match *op {
-                        String(ref s) => {
-                            FromStr::from_str::<Operator>(*s).expect("bad value in 'operators'")
-                        }
+                        String(ref s) => s.clone(),
                         _ => fail!("bad value in 'operators'"),
                     }
                 }.collect();
+                ops.add(str_ops);
 
                 TrainingProblem {
                     challenge: challenge,
@@ -98,11 +98,10 @@ impl Request {
                     let id = get_json_str(resp, ~"id");
                     let size = get_json_num(resp, ~"size");
 
-                    let solved = do resp.find(&~"solved").map |b|  {
-                        match **b {
-                            Boolean(x) => x,
-                            _ => fail!("invalid solved boolean")
-                        }
+                    let solved = match resp.find(&~"solved")  {
+                        Some(&Boolean(x)) => x,
+                        None => false,
+                        _ => fail!("invalid solved boolean"),
                     };
 
                     let time_left = do resp.find(&~"timeLeft").map |tl| {
@@ -112,15 +111,14 @@ impl Request {
                         }
                     };
                     let array = get_json_array(resp, ~"operators");
-                    let ops = ~do array.iter().transform |op| {
+                    let mut ops = OperatorSet::new();
+                    let str_ops = do array.iter().transform |op| {
                         match *op {
-                            String(ref s) => {
-                                FromStr::from_str::<Operator>(*s)
-                                    .expect("bad value in 'operators'")
-                            }
+                            String(ref s) => s.clone(),
                             _ => fail!("bad value in 'operators'"),
                         }
                     }.collect();
+                    ops.add(str_ops);
 
                     RealProblem {
                         id: id,
@@ -148,7 +146,7 @@ pub struct TrainingProblem {
     challenge: ~str,
     id: ~str,
     size: u8,
-    operators: ~HashSet<Operator>,
+    operators: OperatorSet,
 }
 
 impl WebEval for TrainingProblem {
@@ -157,17 +155,96 @@ impl WebEval for TrainingProblem {
     }
 }
 
+#[deriving(Clone, Eq)]
 pub struct RealProblem {
     id: ~str,
     size: u8,
-    operators: ~HashSet<Operator>,
+    operators: OperatorSet,
     time_left: Option<float>,
-    solved: Option<bool>
+    solved: bool,
 }
+
+impl Ord for RealProblem {
+    fn lt(&self, other: &RealProblem) -> bool {
+        self.size < other.size
+    }
+}
+
 
 impl WebEval for RealProblem {
     fn get_id(&self) -> ~str {
         self.id.to_owned()
+    }
+}
+
+pub struct OperatorSet {
+    op1: [bool, ..5],
+    op2: [bool, ..4],
+    if0: bool,
+    fold: bool,
+    tfold: bool,
+}
+
+impl OperatorSet {
+    pub fn new() -> OperatorSet {
+        OperatorSet {
+            op1: [false, false, false, false, false],
+            op2: [false, false, false, false],
+            if0: false,
+            fold: false,
+            tfold: false,
+        }
+    }
+
+    pub fn add(&mut self, ops: ~[~str]) {
+        for op in ops.iter() {
+            match *op {
+                ~"not" => self.op1[OP_NOT] = true,
+                ~"shl1" => self.op1[OP_SHL1] = true,
+                ~"shr1" => self.op1[OP_SHR1] = true,
+                ~"shr4" => self.op1[OP_SHR4] = true,
+                ~"shr16" => self.op1[OP_SHR16] = true,
+                ~"and" => self.op2[OP_AND] = true,
+                ~"or" => self.op2[OP_OR] = true,
+                ~"xor" => self.op2[OP_XOR] = true,
+                ~"plus" => self.op2[OP_PLUS] = true,
+                ~"if0" => self.if0 = true,
+                ~"fold" => self.fold = true,
+                ~"tfold" => self.tfold = true,
+                _ => fail!("bad operation"),
+            }
+        }
+    }
+}
+
+impl Clone for OperatorSet {
+    pub fn clone(&self) -> OperatorSet {
+        let mut ops = OperatorSet::new();
+        for i in range(0, 5) {
+            ops.op1[i] = self.op1[i];
+            if i != 4 {
+                ops.op2[i] = self.op2[i];
+            }
+        }
+        ops.if0 = self.if0;
+        ops.fold = self.fold;
+        ops.tfold = self.tfold;
+        ops
+    }
+}
+
+impl Eq for OperatorSet {
+    pub fn eq(&self, other: &OperatorSet) -> bool {
+        for i in range(0, 5) {
+            if other.op1[i] != self.op1[i] { return false; }
+            if i != 4 {
+                if other.op2[i] != self.op2[i] { return false; }
+            }
+        }
+        if other.if0 != self.if0 { return false; }
+        if other.fold != self.fold { return false; }
+        if other.tfold != self.tfold { return false; }
+        true
     }
 }
 
