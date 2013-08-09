@@ -2,7 +2,7 @@
 
 this is set to 3.5s per request, which is crappy an often fails anyway
 
-# handle bad guesses
+# handle bad guesses (dbaupp)
 
 these send back failing cases or something. we should add these to the
 constraints so the next guess will be better
