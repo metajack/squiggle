@@ -6,13 +6,16 @@ extern mod std;
 extern mod extra;
 
 use webapi::{Request, TrainOperators, Empty};
+use program::{Ident, Program};
 
 pub mod webapi;
 pub mod program;
 
 fn main() {
-    let status = webapi::Request::get_status();
-    println(status.to_str());
+    // let status = webapi::Request::get_status();
+    // println(status.to_str());
 
-    let prob = webapi::Request::get_training_problem(3, Empty);
+    // let prob = webapi::Request::get_training_problem(3, Empty);
+
+    println(Program::new(~"x", ~Ident(~"x")).to_str());
 }
