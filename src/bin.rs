@@ -40,7 +40,7 @@ fn main() {
     printfln!(prog.eval(0x1122334455667788))
 
     // some random programs
-    let mut gen = NaiveGen::new();
+    let mut gen = NaiveGen::new(30);
     for _ in range(0, 5) {
         printfln!(gen.gen_prog().to_str());
         gen.reset();

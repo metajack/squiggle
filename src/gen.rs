@@ -21,16 +21,21 @@ pub struct NaiveGen {
     rng: IsaacRng,
     scopes: ScopeStack,
     next_symbol: u8,
+    max_size: u8,
+    size: u8,
 }
 
 impl NaiveGen {
-    pub fn new() -> NaiveGen {
+    pub fn new(max_size: u8) -> NaiveGen {
+        assert!(max_size >= 3 && max_size <= 30);
         NaiveGen {
             rng: IsaacRng::new(),
             scopes: ScopeStack {
                 stack: ~[],
             },
             next_symbol: 0,
+            max_size: max_size,
+            size: 0,
         }
     }
 
@@ -39,6 +44,7 @@ impl NaiveGen {
             stack: ~[],
         };
         self.next_symbol = 0;
+        self.size = 0;
     }
 }
 
@@ -51,29 +57,71 @@ impl Generator for NaiveGen {
     }
 
     pub fn gen_expr(&mut self) -> Expr {
-        let choice = self.rng.gen_uint_range(0, 6);
-        match choice {
-            0 => Zero,
-            1 => One,
-            2 => Ident(self.get_sym()),
-            3 => {
-                let test = self.gen_expr();
-                let then = self.gen_expr();
-                let other = self.gen_expr();
-                If0(~test, ~then, ~other)
+        loop {
+            let choice = self.rng.gen_uint_range(0, 7);
+            match choice {
+                0 => {
+                    self.size += 1;
+                    return Zero;
+                }
+                1 => {
+                    self.size += 1;
+                    return One;
+                }
+                2 => {
+                    self.size += 1;
+                    return Ident(self.get_sym());
+                }
+                3 => {
+                    if self.size + 4 <= self.max_size {
+                        self.size += 1;
+                        let test = self.gen_expr();
+                        let then = self.gen_expr();
+                        let other = self.gen_expr();
+                        return If0(~test, ~then, ~other);
+                    }
+                    loop;
+                }
+                4 => {
+                    if self.size + 2 <= self.max_size {
+                        self.size += 1;
+                        let op = self.rng.gen();
+                        let expr = self.gen_expr();
+                        return Op1(op, ~expr);
+                    }
+                    loop;
+                }
+                5 => {
+                    if self.size + 3 <= self.max_size {
+                        let op = self.rng.gen();
+                        let left = self.gen_expr();
+                        let right = self.gen_expr();
+                        return Op2(op, ~left, ~right);
+                    }
+                    loop;
+                }
+                6 => {
+                    if self.size + 5 <= self.max_size {
+                        let foldee = self.gen_expr();
+                        let init = self.gen_expr();
+                        let next_id = self.gen_sym();
+                        let accum_id = self.gen_sym();
+                        let scope = ~[next_id.clone(), accum_id.clone()];
+                        self.scopes.stack.push(scope);
+                        let body = self.gen_expr();
+                        self.scopes.stack.pop();
+                        return Fold {
+                            foldee: ~foldee,
+                            init: ~init,
+                            next_id: next_id,
+                            accum_id: accum_id,
+                            body: ~body,
+                        };
+                    }
+                    loop;
+                }
+                _ => fail!(~"unexpected random value"),
             }
-            4 => {
-                let op = self.rng.gen();
-                let expr = self.gen_expr();
-                Op1(op, ~expr)
-            }
-            5 => {
-                let op = self.rng.gen();
-                let left = self.gen_expr();
-                let right = self.gen_expr();
-                Op2(op, ~left, ~right)
-            }
-            _ => fail!(~"unexpected random value"),
         }
     }
 
@@ -81,6 +129,7 @@ impl Generator for NaiveGen {
         let sym = self.gen_sym();
         let scope = ~[sym.clone()];
         self.scopes.stack.push(scope);
+        self.size += 1;
         let expr = self.gen_expr();
         Program::new(sym, ~expr)
     }

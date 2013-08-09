@@ -32,8 +32,8 @@ pub enum Expr {
     Fold {
         foldee: ~Expr,
         init: ~Expr,
-        accum_id: ~str,
         next_id: ~str,
+        accum_id: ~str,
         body: ~Expr
     }
 }
