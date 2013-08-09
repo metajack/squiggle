@@ -4,6 +4,7 @@ use std::to_str::ToStr;
 use extra::json;
 use extra::json::{Json, ToJson, Object, Number, String, List};
 use extra::treemap::TreeMap;
+use program::Operator;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
@@ -71,7 +72,9 @@ impl Request {
                 let array = get_json_array(obj, ~"operators");
                 for op in array.iter() {
                     match *op {
-                        String(ref s) => ops.insert(s.clone()),
+                        String(ref s) => {
+                            ops.insert(FromStr::from_str(*s).expect("bad value in 'operators'"))
+                        }
                         _ => fail!("bad value in 'operators'"),
                     };
                 };
@@ -100,7 +103,7 @@ pub struct TrainingProblem {
     challenge: ~str,
     id: ~str,
     size: u8,
-    operators: ~HashSet<~str>,
+    operators: ~HashSet<Operator>,
 }
 
 fn get_json_array<'a>(obj: &'a Object, key: ~str) -> ~[Json] {

@@ -21,7 +21,7 @@ pub struct Program {
     expr: ~Expr,
 }
 
-#[deriving(Rand,Eq)]
+#[deriving(Rand,Eq,IterBytes)]
 pub enum UnaOp {
     Not,
     Shl1,
@@ -30,12 +30,41 @@ pub enum UnaOp {
     Shr16,
 }
 
-#[deriving(Rand,Eq)]
+#[deriving(Rand,Eq,IterBytes)]
 pub enum BinOp {
     And,
     Or,
     Xor,
     Plus,
+}
+
+#[deriving(Eq,IterBytes)]
+pub enum Operator {
+    Operator_Op1(UnaOp),
+    Operator_Op2(BinOp),
+    Operator_TFold,
+    Operator_Fold,
+    Operator_If0
+}
+
+impl FromStr for Operator {
+    fn from_str(s: &str) -> Option<Operator> {
+        match s {
+            "not" => Some(Operator_Op1(Not)),
+            "shl1" => Some(Operator_Op1(Shl1)),
+            "shr1" => Some(Operator_Op1(Shr1)),
+            "shr4" => Some(Operator_Op1(Shr4)),
+            "shr16" => Some(Operator_Op1(Shr16)),
+            "and" => Some(Operator_Op2(And)),
+            "or" => Some(Operator_Op2(Or)),
+            "xor" => Some(Operator_Op2(Xor)),
+            "plus" => Some( Operator_Op2(Plus)),
+            "if0" => Some(Operator_If0),
+            "fold" => Some(Operator_Fold),
+            "tfold" => Some(Operator_TFold),
+            _ => None
+        }
+    }
 }
 
 #[deriving(Eq)]
@@ -94,7 +123,7 @@ impl FromStr for Program {
 
 impl ToStr for Program {
     pub fn to_str(&self) -> ~str {
-        fmt!("(lambda (%s) %s)", self.id.to_str(), self.expr.to_str())
+        fmt!("(lambda (%s) %s)", id_to_str(self.id), self.expr.to_str())
     }
 }
 
@@ -156,12 +185,12 @@ impl ToStr for Expr {
             }
             Fold {
                 foldee: ref foldee, init: ref init,
-                accum_id: ref accum_id, next_id: ref next_id,
+                accum_id, next_id,
                 body: ref body
             } => {
                 fmt!("(fold %s %s (lambda (%s %s) %s))",
                      foldee.to_str(), init.to_str(),
-                     accum_id.to_str(), next_id.to_str(),
+                     id_to_str(accum_id), id_to_str(next_id),
                      body.to_str())
             }
         }

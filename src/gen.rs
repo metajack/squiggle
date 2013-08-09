@@ -15,7 +15,7 @@ pub trait Generator {
 }
 
 pub enum GenMsg {
-    Reset(u8, ~HashSet<~str>, ~[(u64, u64)]),
+    Reset(u8, ~HashSet<Operator>, ~[(u64, u64)]),
     Generate(Chan<~Program>),
     Exit,
 }
@@ -33,13 +33,14 @@ pub struct NaiveGenState {
     scopes: ScopeStack,
     next_symbol: u8,
     max_size: u8,
-    operations: ~HashSet<~str>,
+    operations: ~HashSet<Operator>,
     constraints: ~[(u64, u64)],
     size: u8,
 }
 
 impl NaiveGen {
-    pub fn new(max_size: u8, operations: ~HashSet<~str>, constraints: ~[(u64, u64)]) -> NaiveGen {
+    pub fn new(max_size: u8, operations: ~HashSet<Operator>,
+               constraints: ~[(u64, u64)]) -> NaiveGen {
         let (port, chan) = comm::stream();
 
         let port = Cell::new(port);
@@ -106,7 +107,7 @@ impl NaiveGenState {
         }
     }
 
-    pub fn reset(&mut self, max_size: u8, operations: ~HashSet<~str>, constraints: ~[(u64, u64)]) {
+    pub fn reset(&mut self, max_size: u8, operations: ~HashSet<Operator>, constraints: ~[(u64, u64)]) {
         assert!(max_size >= 3 && max_size <= 30);
         self.scopes = ScopeStack {
             stack: ~[],
@@ -143,7 +144,7 @@ impl Generator for NaiveGenState {
                     return Ident(self.get_sym());
                 }
                 3 => { // if0
-                    let op_ok = self.operations.contains(&~"if0");
+                    let op_ok = self.operations.contains(&Operator_If0);
                     if op_ok && self.size + 4 <= self.max_size {
                         self.size += 1;
                         let test = self.gen_expr();

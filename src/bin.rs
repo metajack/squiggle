@@ -77,7 +77,8 @@ fn main() {
     //   for candidate in program_gen() {
     //       ...
     //   }
-    let _candidate = gen.next();
+    let candidate = gen.next();
+    println(candidate.to_str());
     // TODO: guess
 }
 
