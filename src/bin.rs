@@ -41,7 +41,7 @@ fn main() {
     printfln!(prog.eval(0x1122334455667788))
 
     // some random programs
-    let mut gen = NaiveGen::new(30);
+    let mut gen = NaiveGen::new(30, ~[]);
     for _ in range(0, 5) {
         printfln!(gen.next().to_str());
         gen.reset();
@@ -64,7 +64,7 @@ fn main() {
 
 fn find_matching(match_against: &Program) -> ~Program {
     let mut rng = std::rand::task_rng();
-    let mut gen = NaiveGen::new(30);
+    let mut gen = NaiveGen::new(30, ~[]);
 
     for i in std::iterator::count(0u, 1) {
         let prog = gen.next();
@@ -83,23 +83,7 @@ fn find_matching(match_against: &Program) -> ~Program {
 }
 
 // TODO this needs to take a max time to think
-fn find_matching_with_constraints(max_size: u8, constraints: &[(u64, u64)]) -> ~Program {
-    let mut iterations = 0;
-    'newprog: loop {
-        let mut gen = NaiveGen::new(max_size);
-        let prog = gen.next();
-        iterations += 1;
-
-        let mut failed = false;
-        for &(x, y) in constraints.iter() {
-            if prog.eval(x) != y {
-                failed = true;
-                loop 'newprog;
-            }
-        }
-
-        printfln!("checked %u programs", iterations);
-        return prog;
-    }
-    fail!()
+fn find_matching_with_constraints(max_size: u8, constraints: ~[(u64, u64)]) -> ~Program {
+    let mut gen = NaiveGen::new(max_size, constraints);
+    gen.next()
 }

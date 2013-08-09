@@ -39,7 +39,7 @@ pub struct NaiveGenState {
 }
 
 impl NaiveGen {
-    pub fn new(max_size: u8) -> NaiveGen {
+    pub fn new(max_size: u8, constraints: ~[(u64, u64)]) -> NaiveGen {
         let (port, chan) = comm::stream();
 
         let port = Cell::new(port);
@@ -47,7 +47,7 @@ impl NaiveGen {
             NaiveGen::generate(port.take());
         }
 
-        chan.send(Reset(max_size, ~[]));
+        chan.send(Reset(max_size, constraints));
         NaiveGen(chan)
     }
 
@@ -65,14 +65,25 @@ impl NaiveGen {
         let mut gen = NaiveGenState::new();
         loop {
             match port.try_recv() {
-                None => return,
-                Some(Exit) => return,
+                None => break,
+                Some(Exit) => break,
                 Some(Reset(max_size, constraints)) => {
                     gen.reset(max_size, constraints);
                 }
                 Some(Generate(chan)) => {
-                    let prog = gen.gen_prog();
-                    chan.send(~prog);
+                    let mut i = 0;
+                    'newprog: loop {
+                        let prog = gen.gen_prog();
+                        i += 1;
+                        for &(x, y) in gen.constraints.iter() {
+                            if prog.eval(x) != y {
+                                loop 'newprog;
+                            }
+                        }
+                        printfln!("genned constrained prog in %u iters", i);
+                        chan.send(~prog);
+                        break;
+                    }
                 }
             }
         }
@@ -217,7 +228,7 @@ mod tests {
 
     #[bench]
     fn bench_gen_prog(bh: &mut BenchHarness) {
-        let mut gen = NaiveGen::new(30);
+        let mut gen = NaiveGen::new(30, ~[]);
         do bh.iter {
             gen.next();
         }
