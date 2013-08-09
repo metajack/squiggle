@@ -1,9 +1,9 @@
+use std::hashmap::HashSet;
 use std::run::{Process, ProcessOptions};
 use std::to_str::ToStr;
 use extra::json;
-use extra::json::{Json, Object, ToJson};
+use extra::json::{Json, ToJson, Object, Number, String, List};
 use extra::treemap::TreeMap;
-use extra::url;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
@@ -53,10 +53,33 @@ impl Request {
         StatusResponse(response)
     }
 
-    pub fn get_training_problem(size: u8, operators: TrainOperators) {
+    pub fn get_training_problem(size: u8, operators: TrainOperators) -> TrainingProblem {
         let req = Train { size: size, operators: operators };
         let response = post_request(req.to_url(), req.to_json_str());
-        println(response.to_str());
+
+        match *response {
+            Object(obj) => {
+                let challenge = get_json_str(obj, ~"challenge");
+                let id = get_json_str(obj, ~"id");
+                let size = get_json_num(obj, ~"size");
+                let mut ops = ~HashSet::new();
+                let array = get_json_array(obj, ~"operators");
+                for op in array.iter() {
+                    match *op {
+                        String(ref s) => ops.insert(s.clone()),
+                        _ => fail!("bad value in 'operators'"),
+                    };
+                };
+
+                TrainingProblem {
+                    challenge: challenge,
+                    id: id,
+                    size: size as u8,
+                    operators: ops,
+                }
+            }
+            _ => fail!("bad response"),
+        }
     }
 }
 
@@ -68,11 +91,32 @@ impl ToStr for StatusResponse {
     }
 }
 
-struct TrainingProblem {
+pub struct TrainingProblem {
     challenge: ~str,
     id: ~str,
     size: u8,
-    operators: ~[~str],
+    operators: ~HashSet<~str>,
+}
+
+fn get_json_array<'a>(obj: &'a Object, key: ~str) -> ~[Json] {
+    match obj.find(&key) {
+        Some(&List(ref l)) => l.clone(),
+        _ => fail!(fmt!("unexpected type for '%s'", key)),
+    }
+}
+
+fn get_json_num(obj: &Object, key: ~str) -> float {
+    match obj.find(&key) {
+        Some(&Number(n)) => n,
+        _ => fail!(fmt!("unexpected type for '%s'", key)),
+    }
+}
+
+fn get_json_str(obj: &Object, key: ~str) -> ~str {
+    match obj.find(&key) {
+        Some(&String(ref s)) => s.clone(),
+        _ => fail!(fmt!("unexpected type for '%s'", key)),
+    }
 }
 
 fn make_url(path: &str) -> ~str {

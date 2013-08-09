@@ -1,5 +1,3 @@
-use std::rand::Rand;
-
 pub struct Program {
     id: ~str,
     expr: ~Expr,
@@ -70,7 +68,7 @@ impl Expr {
 }
 
 impl FromStr for Program {
-    pub fn from_str(s: &str) -> Option<Program> {
+    pub fn from_str(_s: &str) -> Option<Program> {
         None
     }
 }

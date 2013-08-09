@@ -9,7 +9,7 @@ use std::rand::RngUtil;
 use eval::Eval;
 use gen::*;
 use program::*;
-use webapi::{Request, TrainOperators, Empty};
+use webapi::*;
 
 pub mod eval;
 pub mod gen;
@@ -18,48 +18,50 @@ pub mod program;
 pub mod webapi;
 
 fn main() {
-    // let status = webapi::Request::get_status();
-    // println(status.to_str());
+    // println(Program::new(~"x", ~Ident(~"x")).to_str());
 
-    // let prob = webapi::Request::get_training_problem(3, Empty);
+    // // (|x| x << 1 + x)(10)
+    // printfln!(Program::new(~"x", ~Op2(Plus,
+    //                                   ~Op1(Shl1, ~Ident(~"x")),
+    //                                   ~Ident(~"x"))).eval(10));
 
-    println(Program::new(~"x", ~Ident(~"x")).to_str());
+    // let prog = Program::new(~"x", ~Fold {
+    //         foldee: ~Ident(~"x"),
+    //         init: ~Zero,
+    //         accum_id: ~"y",
+    //         next_id: ~"z",
+    //         body: ~Op2(Or, ~Ident(~"y"), ~Ident(~"z"))
+    //     });
 
-    // (|x| x << 1 + x)(10)
-    printfln!(Program::new(~"x", ~Op2(Plus,
-                                      ~Op1(Shl1, ~Ident(~"x")),
-                                      ~Ident(~"x"))).eval(10));
+    // printfln!(prog.eval(0x1122334455667788))
 
-    let prog = Program::new(~"x", ~Fold {
-            foldee: ~Ident(~"x"),
-            init: ~Zero,
-            accum_id: ~"y",
-            next_id: ~"z",
-            body: ~Op2(Or, ~Ident(~"y"), ~Ident(~"z"))
-        });
+    // // some random programs
+    // let mut gen = NaiveGen::new(30, ~[]);
+    // for _ in range(0, 5) {
+    //     printfln!(gen.next().to_str());
+    //     gen.reset();
+    // }
 
-    printfln!(prog.eval(0x1122334455667788))
+    // let prog = Program::new(~"x", ~Op2(Plus, ~Ident(~"x"), ~Ident(~"x")));
+    // printfln!("matching against %s", prog.to_str());
+    // println(find_matching(&prog).to_str());
 
-    // some random programs
-    let mut gen = NaiveGen::new(30, ~[]);
-    for _ in range(0, 5) {
-        printfln!(gen.next().to_str());
-        gen.reset();
-    }
+    // let prog = Program::new(~"x", ~Op1(Shr1, ~Ident(~"x")));
+    // let mut constraints = ~[];
+    // let mut rng = std::rand::task_rng();
+    // for _ in range(0, 10) {
+    //     let x = rng.gen();
+    //     constraints.push((x, prog.eval(x)));
+    // }
+    // printfln!("finding match for %s", prog.to_str());
+    // println(find_matching_with_constraints(3, constraints).to_str());
 
-    let prog = Program::new(~"x", ~Op2(Plus, ~Ident(~"x"), ~Ident(~"x")));
-    printfln!("matching against %s", prog.to_str());
-    println(find_matching(&prog).to_str());
+    let status = Request::get_status();
+    println(status.to_str());
 
-    let prog = Program::new(~"x", ~Op1(Shr1, ~Ident(~"x")));
-    let mut constraints = ~[];
-    let mut rng = std::rand::task_rng();
-    for _ in range(0, 10) {
-        let x = rng.gen();
-        constraints.push((x, prog.eval(x)));
-    }
-    printfln!("finding match for %s", prog.to_str());
-    println(find_matching_with_constraints(3, constraints).to_str());
+    let prob = webapi::Request::get_training_problem(5, Empty);
+    printfln!("%?", prob);
+
 }
 
 fn find_matching(match_against: &Program) -> ~Program {

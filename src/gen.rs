@@ -3,8 +3,7 @@ use program::*;
 use std::cell::Cell;
 use std::comm;
 use std::comm::{Port, Chan};
-use std::num::ToStrRadix;
-use std::rand::{Rng, RngUtil, IsaacRng, IsaacRng};
+use std::rand::{Rng, RngUtil, IsaacRng};
 use std::str;
 
 pub trait Generator {
