@@ -8,5 +8,6 @@ extern mod extra;
 pub mod webapi;
 
 fn main() {
-    webapi::Request::status();
+    let response = webapi::Request::status();
+    println(response.to_str());
 }

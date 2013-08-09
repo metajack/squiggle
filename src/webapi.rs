@@ -1,5 +1,7 @@
 use std::run::{Process, ProcessOptions};
+use std::to_str::ToStr;
 use extra::json;
+use extra::json::Json;
 
 static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 
@@ -9,8 +11,6 @@ enum Request {
     Status,
     Train { size: u8, operators: ~str },
 }
-
-
 
 impl Request {
     pub fn to_url(&self) -> ~str {
@@ -22,16 +22,17 @@ impl Request {
         }
     }
 
-    pub fn status() {
-        println(Status.to_url());
-        let mut p = Process::new(
-            "curl",
-            [Status.to_url()],
-            ProcessOptions::new());
+    pub fn status() -> StatusResponse {
+        let response = get_request(Status.to_url());
+        StatusResponse(response)
+    }
+}
 
-        let out = p.output();
-        println(fmt!("read: %s", 
-                     json::to_pretty_str(&json::from_reader(out).unwrap())));
+struct StatusResponse(~Json);
+
+impl ToStr for StatusResponse {
+    pub fn to_str(&self) -> ~str {
+        json::to_pretty_str(**self)
     }
 }
 
@@ -42,4 +43,9 @@ fn make_url(path: &str) -> ~str {
     s.push_str(PRIVATE_KEY.trim());
     s.push_str("vpsH1H");
     s
+}
+
+fn get_request(url: ~str) -> ~Json {
+    let mut p = Process::new("curl", [url], ProcessOptions::new());
+    ~json::from_reader(p.output()).unwrap()
 }
