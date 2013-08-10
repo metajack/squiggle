@@ -19,4 +19,4 @@ squiggle-test: $(RUST_SRC) src/private.key
 .PHONY: clean
 clean:
 	@echo "cleaning"
-	@rm -rf squiggle squiggle.dSYM
+	@rm -rf squiggle squiggle.dSYM squiggle-test squiggle-test.dSYM
