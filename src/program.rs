@@ -54,6 +54,25 @@ impl OperatorSet {
     }
 }
 
+impl ToStr for OperatorSet {
+    pub fn to_str(&self) -> ~str {
+        let mut ops = ~[];
+        if self.tfold { ops.push(~"tfold"); }
+        if self.fold { ops.push(~"fold"); }
+        if self.if0 { ops.push(~"if0"); }
+        if self.op1[0] { ops.push(~"not"); }
+        if self.op1[1] { ops.push(~"shl1"); }
+        if self.op1[2] { ops.push(~"shr1"); }
+        if self.op1[3] { ops.push(~"shr4"); }
+        if self.op1[4] { ops.push(~"shr16"); }
+        if self.op2[0] { ops.push(~"and"); }
+        if self.op2[1] { ops.push(~"or"); }
+        if self.op2[2] { ops.push(~"xor"); }
+        if self.op2[3] { ops.push(~"plus"); }
+        ops.connect(",")
+    }
+}
+
 impl Clone for OperatorSet {
     pub fn clone(&self) -> OperatorSet {
         let mut ops = OperatorSet::new();

@@ -1,7 +1,3 @@
-# throttle api use (jack)
-
-this is set to 3.5s per request, which is crappy an often fails anyway
-
 # constrain gen to use only one fold (eatkinson)
 
 also, tfold means the fold is the top level

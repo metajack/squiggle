@@ -38,6 +38,7 @@ fn main() {
             }
         }
         ~"problems" => problems(),
+        ~"showprobs" => show_problems(),
         _ => println("error: unknown command"),
     }
 }
@@ -110,6 +111,50 @@ fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statist
     }
     stats.end();
     stats.report();
+}
+
+fn show_problems() {
+    let mut api = WebApi::new();
+    let mut probs: ~[RealProblem] = api.get_problems_blocking().consume_iter().collect();
+    sort::tim_sort(probs);
+
+    let mut stats = vec::from_elem(28, 0u);
+    let mut failed = 0u;
+    let mut solved = 0u;
+    let mut total = 0u;
+
+    for prob in probs.iter() {
+        let status = match (prob.solved, prob.time_left) {
+            (true, _) => {
+                solved += 1;
+                "SOLVED"
+            }
+            (false, None) => "UNSOLVED",
+            (false, Some(0f)) => {
+                failed += 1;
+                "FAILED"
+            }
+            (false, Some(_)) => "IN PROGRESS",
+        };
+        total += 1;
+        stats[prob.problem.size - 3] += 1;
+
+        printfln!("%s -- %u -- %s -- %s",
+                  status,
+                  prob.problem.size as uint,
+                  prob.problem.operators.to_str(),
+                  prob.problem.id);
+    }
+
+    println("SIZES:");
+    for i in range(3, 31) {
+        printfln!("\tsize %i: %u", i, stats[i - 3]);
+    }
+
+
+    printfln!("STATS: %u (%u%%) solved -- %u (%u%%) failed",
+              solved, ((solved as float) / (total as float) * 100f) as uint,
+              failed, ((failed as float) / (total as float) * 100f) as uint);
 }
 
 struct Statistics {
