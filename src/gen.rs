@@ -196,6 +196,7 @@ impl RandomGenState {
     }
 
     fn gen_program(&mut self, mut size: uint) -> Program {
+        //println("gen_program");
         // remove the size of each program (1)
         size -= 1;
 
@@ -218,6 +219,7 @@ impl RandomGenState {
     }
 
     fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {
+        //printfln!("gen_expr(%u)", size);
         match size {
             1 => {
                 // Choices:
@@ -253,7 +255,9 @@ impl RandomGenState {
                     n => {
                         assert!(self.op2_len > 0);
 
+                        //println("genning left");
                         let left = self.gen_expr(1, idents, foldable);
+                        //println("genning right");
                         let right = self.gen_expr(1, idents, foldable);
                         Op2(self.op2_choices[n - self.op1_len], ~left, ~right)
                     }
@@ -264,19 +268,34 @@ impl RandomGenState {
                 // 1. UnaOp (op1_len)
                 // 2. BinOp (op2_len) * (2 = spaces - 1)
                 // 3. If0 (1?)
-                let if_len = if self.operators.if0 { 1 } else { 0 };
 
-                // If there are no unaops, then we must be able to place an if
-                assert!(self.op1_len > 0 || self.operators.if0);
+                // can only gen binops if we have unaops, otherwise we'd have a 2/1 slot split and 2 is bad
+                let gen_binop = self.op1_len > 0;
 
-                match self.rng.gen_uint_range(0, self.op1_len + self.op2_len * 2 + if_len) {
-                    n if n < self.op1_len => {
+                // If there are no unaops, then we must be able to place an if or fold
+                assert!(self.op1_len > 0 || self.operators.if0 || foldable);
+
+                let mut choices = self.op1_len;
+                let op1_end = self.op1_len;
+                if gen_binop {
+                    choices += self.op2_len;
+                }
+                let op2_end = choices;
+
+                if self.operators.if0 {
+                    choices += 1;
+                }
+                let if_end = choices;
+
+                match self.rng.gen_uint_range(0, choices) {
+                    n if n < op1_end => {
                         assert!(self.op1_len > 0);
 
                         let expr = self.gen_expr(3, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
-                    n if n < self.op1_len + self.op2_len * 2 => {
+                    n if n < op2_end => {
+                        //println("genning binop");
                         assert!(self.op2_len > 0);
 
                         let left_bigger = self.rng.gen::<bool>();
@@ -285,19 +304,26 @@ impl RandomGenState {
                         } else {
                             (1, 2)
                         };
+                        //println("genning left");
                         let left = self.gen_expr(left_size, idents, foldable);
+                        //println("genning right");
                         let right = self.gen_expr(right_size, idents, foldable);
                         let op = self.rng.gen::<BinOp>();
                         Op2(op, ~left, ~right)
                     }
-                    _ => {
+                    n if n < if_end => {
+                        //println("genning if0");
                         assert!(self.operators.if0);
 
+                        //println("genning test");
                         let test = self.gen_expr(1, idents, foldable);
+                        //println("genning then");
                         let then = self.gen_expr(1, idents, foldable);
+                        //println("genning other");
                         let other = self.gen_expr(1, idents, foldable);
                         If0(~test, ~then, ~other)
                     }
+                    _ => fail!("bad choice"),
                 }
             }
             _ => {
@@ -308,66 +334,141 @@ impl RandomGenState {
                 // 4. Fold (1) [only if foldable]
                 let spaces = size - 1;
                 let spaces_choose_2 = spaces * (spaces - 1) / 2;
-                let mut choices = self.op1_len + (self.op2_len * (spaces - 1));
-                if self.operators.if0 {
+
+                let mut choices = self.op1_len;
+
+                let have_unaops = self.op1_len > 0;
+                let have_if0 = self.operators.if0;
+                let have_if0_or_fold = self.operators.if0 || foldable;
+
+                // we can't generate even sized binops without unaops or if
+                let gen_binop = have_unaops || size.is_odd() || have_if0;
+                if gen_binop {
+                    choices += (self.op2_len * (spaces - 1));
+                }
+
+                // we can't generate size=5,6 if0s without unaops as it will
+                // force a size=2. size=4 is handled by previous match arm.
+                let gen_if = have_if0 && (have_unaops || size > 6);
+
+                // we can't generate size=6,7 folds without unaops as it will
+                // force a size=2. we also can only gen size=8,10 if we have if0
+                let gen_fold = foldable && (have_unaops || 
+                                            (have_if0 && (size == 8 || size == 10)) ||
+                                            (size != 5 && size != 6 && size != 8 && size != 10));
+
+                if gen_if {
                     choices += spaces_choose_2;
                 }
-                if foldable {
+                if gen_fold {
                     choices += spaces_choose_2;
                 }
 
-                let op2_end = self.op1_len + (self.op2_len * (spaces - 1));
-                let if_end = if self.operators.if0 {
+                let op2_end = if gen_binop {
+                    self.op1_len + (self.op2_len * (spaces - 1))
+                } else {
+                    self.op1_len
+                };
+
+                let if_end = if gen_if {
                     op2_end + spaces_choose_2
                 } else {
                     op2_end // skipped
                 };
 
+                //printfln!("size=%u and choices=%u", size, choices);
                 match self.rng.gen_uint_range(0, choices) {
                     n if n < self.op1_len => {
+                        //println("genning unaop");
                         assert!(self.op1_len > 0);
 
                         let expr = self.gen_expr(size - 1, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
                     n if n < op2_end => {
+                        //println("genning binop");
                         assert!(self.op2_len > 0);
 
                         let size = size - 1; // account for op
-                        let left_size = self.gen_size(size - 1);
-                        let right_size = size - left_size;
+                        let mut left_size;
+                        let mut right_size;
+                        loop {
+                            left_size = self.gen_size(size - 1, foldable);
+                            right_size = size - left_size;
+
+                            if self.check_size(right_size, foldable) { break; }
+
+                            //printfln!("looping with left=%u and right=%u", left_size, right_size);
+                        }
+                        //printfln!("picked left=%u and right=%u", left_size, right_size);
+
+                        //println("genning left");
                         let left = self.gen_expr(left_size, idents, foldable);
+                        //println("genning right");
                         let right = self.gen_expr(right_size, idents, foldable);
                         let op = self.rng.gen::<BinOp>();
                         Op2(op, ~left, ~right)
                     }
                     n if n < if_end => {
+                        //printfln!("genning if size %u", size);
                         assert!(self.operators.if0);
+                        assert!(self.op1_len > 0 || size != 5);
 
-                        let test_size = self.gen_size(size - 3);
-                        let rest = size - 1 - test_size;
-                        let then_size = self.gen_size(rest - 1);
-                        let other_size = size - 1 - test_size - then_size;
+                        let size = size - 1; // acount for |if|
+
+                        let mut test_size;
+                        let mut then_size;
+                        let mut other_size;
+                        loop {
+                            test_size = self.gen_size(size - 2, foldable);
+                            let rest = size - test_size;
+                            then_size = self.gen_size(rest - 1, foldable);
+                            other_size = rest - then_size;
+
+                            if self.check_size(other_size, foldable) { break; }
+
+                            //printfln!("looping with test=%u, then=%u, other=%u", test_size, then_size, other_size);
+                        }
+                        //printfln!("picked test=%u, then=%u, other=%u", test_size, then_size, other_size);
+
+                        //println("genning test");
                         let test = self.gen_expr(test_size, idents, foldable);
+                        //println("genning then");
                         let then = self.gen_expr(then_size, idents, foldable);
+                        //println("genning other");
                         let other = self.gen_expr(other_size, idents, foldable);
                         If0(~test, ~then, ~other)
                     }
                     _ => {
+                        //println("genning fold");
                         assert!(foldable);
 
                         let size = size - 2; // account for |fold|.
 
-                        // need to leave at least 2 spaces for the
-                        // init and body. (this generates in `[1, size
-                        // - 1)`, i.e. the largest is size - 2)
-                        let foldee_size = self.gen_size(size - 2);
-                        let rest = size - foldee_size;
-                        let init_size = self.gen_size(rest - 1);
-                        let body_size = rest - init_size;
+                        let mut foldee_size;
+                        let mut init_size;
+                        let mut body_size;
+                        //printfln!("size = %u", size);
+                        loop {
+                            //printfln!("size-2=%u", size - 2);
+                            foldee_size = self.gen_size(size - 2, false);
+                            let rest = size - foldee_size;
+                            //printfln!("picked %u rest = %u", foldee_size, rest);
+                            init_size = self.gen_size(rest - 1, false);
+                            //printfln!("picked %u rest = %u", init_size, rest - init_size);
+                            body_size = rest - init_size;
 
+                            if self.check_size(body_size, false) { break; }
+
+                            //printfln!("looping with foldee=%u, init=%u, body=%u", foldee_size, init_size, body_size);
+                        }
+                        //printfln!("picked foldee=%u, init=%u, body=%u", foldee_size, init_size, body_size);
+
+                        //println("genning foldee");
                         let foldee = self.gen_expr(foldee_size, idents, false);
+                        //println("genning init");
                         let init = self.gen_expr(init_size, idents, false);
+                        //println("genning body");
                         let body = self.gen_expr(body_size, idents + 2, false);
 
                         Fold {
@@ -383,36 +484,73 @@ impl RandomGenState {
         }
     }
 
-    // when we genrrate ranges, it might be the case that we can't place a
-    // unaop, so size=2 must be prevented this warps a size=2 choice randomly
-    // up or down (or only down if size < 3.
+    // Generate a size for a slot
     //
-    // additionally, we prevent size=4 if there is no if0, since that forces
-    // binops, cause one of the arguments to be of size=2
-    fn gen_size(&mut self, space: uint) -> uint {
+    // If we can use UnaOps, this is trivial, as all sizes are valid.
+    //
+    // Without UnaOps, we cannot generate any size=2.
+    //
+    // Without if0 or fold, we can't generate any even sizes.
+    //
+    // If we have if0 or fold, we can't generate a size=6, as this would force
+    // a 2 when split three ways.
+    fn gen_size(&mut self, space: uint, foldable: bool) -> uint {
+        //printfln!("gen_size(%u)", space);
         assert!(space >= 1);
 
+        let have_unaops = self.op1_len > 0;
+        let have_fold_or_if0 = foldable || self.operators.if0;
+
         let choice = self.rng.gen_uint_range(1, space + 1);
-        match (choice, self.op1_len > 0) {
-            (2, true) => choice, // don't need to do anything since we have unaops
-            (2, false) if space <= 2 => 1, // not enough space for 3 so go down
-            (2, false) => { // pick from (1,3) at random
-                if self.rng.gen() {
-                    1
+
+        // If we have unaops we're done.
+        if have_unaops { return choice; }
+
+        // If we don't have if0 or fold, force it to be odd.
+        if !have_fold_or_if0 {
+            if choice.is_even() {
+                if space > choice && self.rng.gen() {
+                    return choice + 1;
                 } else {
-                    3
+                    return choice - 1;
                 }
+            } else {
+                return choice;
             }
-            (4, false) if self.operators.if0 => choice, // if we have if we are safe
-            (4, false) => { // can't use 4 so go up or down
-                if space >= 5 {
-                    if self.rng.gen() { 3 } else { 5 }
-                } else {
-                    3
-                }
-            }
-            _ => choice
         }
+            
+        // We have fold/if0, so prevent 6.
+        if choice == 6 {
+            if space > choice && self.rng.gen() {
+                return choice + 1;
+            } else {
+                return choice - 1;
+            }
+        }
+
+        // If we only have fold prevent 4 which is too small for fold.
+        if foldable && choice == 4 {
+            if space > choice && self.rng.gen() {
+                return choice + 1;
+            } else {
+                return choice - 1;
+            }
+        }
+
+        // everythign is ok
+        choice
+    }
+
+    // Check a size for validity
+    //
+    // Check the rules above for a size. This is needed for leftover slots.
+    fn check_size(&mut self, choice: uint, foldable: bool) -> bool {
+        let have_unaops = self.op1_len > 0;
+        let have_fold_or_if0 = foldable || self.operators.if0;
+
+        if have_unaops { return true; }
+        if !have_fold_or_if0 && choice.is_even() { return false; }
+        choice != 6
     }
 }
 
@@ -435,6 +573,36 @@ mod tests {
         };
         let mut gen = RandomGen::new(problem, ~[]);
         do bh.iter {
+            gen.next();
+        }
+    }
+
+    #[test]
+    fn SqTTVYnARE6FeVMn9VNsUOTa() {
+        let mut opset = OperatorSet::new();
+        opset.add(~[~"if0", ~"and", ~"or", ~"plus"]);
+        let problem = Problem {
+            id: ~"test-SqTTVYnARE6FeVMn9VNsUOTa",
+            size: 11,
+            operators: opset,
+        };
+        let mut gen = RandomGen::new(problem, ~[]);
+        for _ in range(0, 10) {
+            //gen.next();
+        }
+    }
+
+    #[test]
+    fn no_unaops_noif_fold() {
+        let mut opset = OperatorSet::new();
+        opset.add(~[~"and", ~"or", ~"plus", ~"xor", ~"fold"]);
+        let problem = Problem {
+            id: ~"no_unaops_noif_fold",
+            size: 11,
+            operators: opset,
+        };
+        let mut gen = RandomGen::new(problem, ~[]);
+        for _ in range(0, 10) {
             gen.next();
         }
     }
