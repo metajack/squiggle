@@ -36,21 +36,67 @@ impl OperatorSet {
     pub fn add(&mut self, ops: ~[~str]) {
         for op in ops.iter() {
             match *op {
-                ~"not" => self.op1[OP_NOT] = true,
-                ~"shl1" => self.op1[OP_SHL1] = true,
-                ~"shr1" => self.op1[OP_SHR1] = true,
-                ~"shr4" => self.op1[OP_SHR4] = true,
-                ~"shr16" => self.op1[OP_SHR16] = true,
-                ~"and" => self.op2[OP_AND] = true,
-                ~"or" => self.op2[OP_OR] = true,
-                ~"xor" => self.op2[OP_XOR] = true,
-                ~"plus" => self.op2[OP_PLUS] = true,
+                ~"not" => self.op1[Not as uint] = true,
+                ~"shl1" => self.op1[Shl1 as uint] = true,
+                ~"shr1" => self.op1[Shr1 as uint] = true,
+                ~"shr4" => self.op1[Shr4 as uint] = true,
+                ~"shr16" => self.op1[Shr16 as uint] = true,
+                ~"and" => self.op2[And as uint] = true,
+                ~"or" => self.op2[Or as uint] = true,
+                ~"xor" => self.op2[Xor as uint] = true,
+                ~"plus" => self.op2[Plus as uint] = true,
                 ~"if0" => self.if0 = true,
                 ~"fold" => self.fold = true,
                 ~"tfold" => self.tfold = true,
                 _ => fail!("bad operation"),
             }
         }
+    }
+
+    fn add_from_expr(&mut self, e: &Expr) {
+        match *e {
+            Op1(op, ~ref sub_e) => {
+                self.op1[op as uint] = true;
+                self.add_from_expr(sub_e)
+            }
+            Op2(op, ~ref lhs, ~ref rhs) => {
+                self.op2[op as uint] = true;
+                self.add_from_expr(lhs);
+                self.add_from_expr(rhs);
+            }
+            If0(~ref c, ~ref t, ~ref e) => {
+                self.if0 = true;
+                self.add_from_expr(c);
+                self.add_from_expr(t);
+                self.add_from_expr(e);
+            }
+            Fold {foldee: ~ref foldee, init: ~ref init, body: ~ref body, _ } => {
+                self.fold = true;
+                self.add_from_expr(foldee);
+                self.add_from_expr(init);
+                self.add_from_expr(body);
+            }
+            Ident(_) | One | Zero => {} // no operations
+        }
+    }
+
+    pub fn add_from_program(&mut self, p: &Program) {
+        match *p.expr {
+            // need to handle tfold specially; note that this isn't
+            // quite right (since it doesn't check for shadowing)
+            Fold {foldee: ~ref foldee, init: ~ref init, body: ~ref body, _ } => {
+                match (foldee, init) {
+                    (&Ident(_), &Zero) => {
+                        self.tfold = true;
+                        self.add_from_expr(body);
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        self.add_from_expr(p.expr)
     }
 }
 
@@ -104,64 +150,46 @@ impl Eq for OperatorSet {
     }
 }
 
-#[deriving(Eq)]
+#[deriving(Eq, Clone)]
 pub struct Program {
     id: Id,
     expr: ~Expr,
 }
 
-pub static OP_NOT: uint = 0;
-pub static OP_SHL1: uint = 1;
-pub static OP_SHR1: uint = 2;
-pub static OP_SHR4: uint = 3;
-pub static OP_SHR16: uint = 4;
+pub static OP1_CHOICE: [UnaOp, ..5] = [Not, Shl1, Shr1, Shr4, Shr16];
 
-#[deriving(Rand,Eq,IterBytes)]
+#[deriving(Rand,Eq, Clone)]
 pub enum UnaOp {
-    Not,
-    Shl1,
-    Shr1,
-    Shr4,
-    Shr16,
+    Not = 0,
+    Shl1 = 1,
+    Shr1 = 2,
+    Shr4 = 3,
+    Shr16 = 4,
 }
 
 impl UnaOp {
     fn in_ops(&self, ops: &OperatorSet) -> bool {
-        match *self {
-            Not => ops.op1[OP_NOT],
-            Shl1 => ops.op1[OP_SHL1],
-            Shr1 => ops.op1[OP_SHR1],
-            Shr4 => ops.op1[OP_SHR4],
-            Shr16 => ops.op1[OP_SHR16],
-        }
+        ops.op1[*self as uint]
     }
 }
 
-pub static OP_AND: uint = 0;
-pub static OP_OR: uint = 1;
-pub static OP_XOR: uint = 2;
-pub static OP_PLUS: uint = 3;
+pub static OP2_CHOICE: [BinOp, ..4] = [And, Or, Xor, Plus];
 
-#[deriving(Rand,Eq,IterBytes)]
+#[deriving(Rand,Eq, Clone)]
 pub enum BinOp {
-    And,
-    Or,
-    Xor,
-    Plus,
+    And = 0,
+    Or = 1,
+    Xor = 2,
+    Plus = 3,
 }
 
 impl BinOp {
     fn in_ops(&self, ops: &OperatorSet) -> bool {
-        match *self {
-            And => ops.op2[OP_AND],
-            Or => ops.op2[OP_OR],
-            Xor => ops.op2[OP_XOR],
-            Plus => ops.op2[OP_PLUS],
-        }
+        ops.op2[*self as uint]
     }
 }
 
-#[deriving(Eq)]
+#[deriving(Eq, Clone)]
 pub enum Expr {
     Zero,
     One,
@@ -188,6 +216,12 @@ impl Program {
 
     pub fn len(&self) -> u8 {
         1 + self.expr.len()
+    }
+
+    pub fn operators(&self) -> OperatorSet {
+        let mut operators = OperatorSet::new();
+        operators.add_from_program(self);
+        operators
     }
 }
 
