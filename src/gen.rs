@@ -256,7 +256,14 @@ mod tests {
 
     #[bench]
     fn bench_gen_prog(bh: &mut BenchHarness) {
-        let mut gen = NaiveGen::new(30, OperatorSet::new(), ~[]);
+        let mut opset = OperatorSet::new();
+        opset.add(~[~"shl1", ~"not", ~"and", ~"xor", ~"if0"]);
+        let problem = Problem {
+            id: ~"asdf",
+            size: 30,
+            operators: opset,
+        };
+        let mut gen = RandomGen::new(problem, ~[]);
         do bh.iter {
             gen.next();
         }
