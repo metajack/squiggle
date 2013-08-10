@@ -233,7 +233,7 @@ impl RandomGenState {
                 // 1. UnaOp (op1_len)
                 // 2. BinOp (op2_len) * (spaces - 1)
                 // 3. If0 ((spaces - 1) choose 2 = 1/2 * (n - 1) * (n - 2))
-                // 4. Fold (1) [only if foldable && !root]
+                // 4. Fold (1) [only if foldable]
                 let spaces = size - 1;
                 let spaces_choose_2 = spaces * (spaces - 1) / 2;
                 let mut choices = self.op1_len + (self.op2_len * (spaces - 1));
@@ -275,13 +275,21 @@ impl RandomGenState {
                         If0(~test, ~then, ~other)
                     }
                     _ => {
-                        let foldee_size = self.rng.gen_uint_range(1, size - 3);
-                        let rest = size - 1 - foldee_size;
-                        let init_size = self.rng.gen_uint_range(1, rest - 1);
-                        let body_size = size - 1 - foldee_size - init_size;
+                        let size = size - 2; // account for |fold|.
+
+                        // need to leave at least 2 spaces for the
+                        // init and body. (this generates in `[1, size
+                        // - 1)`, i.e. the largest is size - 2)
+                        let foldee_size = self.rng.gen_uint_range(1, size - 1);
+                        let rest = size - foldee_size;
+
+                        let init_size = self.rng.gen_uint_range(1, rest);
+                        let body_size = rest - init_size;
+
                         let foldee = self.gen_expr(foldee_size, idents, false);
                         let init = self.gen_expr(init_size, idents, false);
                         let body = self.gen_expr(body_size, idents + 2, false);
+
                         Fold {
                             foldee: ~foldee,
                             init: ~init,
