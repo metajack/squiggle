@@ -266,7 +266,7 @@ impl ToStr for Expr {
             } => {
                 fmt!("(fold %s %s (lambda (%s %s) %s))",
                      foldee.to_str(), init.to_str(),
-                     id_to_str(accum_id), id_to_str(next_id),
+                     id_to_str(next_id), id_to_str(accum_id),
                      body.to_str())
             }
         }
