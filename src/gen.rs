@@ -141,8 +141,23 @@ impl RandomGenState {
         self.op2_choices = op2_choices;
     }
 
-    fn gen_program(&mut self, size: uint) -> Program {
-        let expr = self.gen_expr(size - 1, 1, self.operators.fold, true);
+    fn gen_program(&mut self, mut size: uint) -> Program {
+        // remove the size of each program (1)
+        size -= 1;
+
+        let expr = if self.operators.tfold {
+            // remove the sizes of fold, x and 0
+            let body = ~self.gen_expr(size - 2 - 1 - 1, 2, false, false);
+            Fold {
+                foldee: ~Ident(0),
+                init: ~Zero,
+                accum_id: 0,
+                next_id: 1,
+                body: body
+            }
+        } else {
+            self.gen_expr(size, 1, self.operators.fold, true)
+        };
         Program::new(0, ~expr)
     }
 
@@ -157,8 +172,7 @@ impl RandomGenState {
                 match choice {
                     0 => Zero,
                     1 => One,
-                    2 => Ident(choice - 2),
-                    _ => fail!("unepected coin toss"),
+                    _ => Ident(choice - 2),
                 }
             }
             2 => {
