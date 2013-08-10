@@ -46,11 +46,26 @@ fn main() {
                 } else {
                     Empty
                 };
-                train(FromStr::from_str(args[2]).expect("bad size"), 
+                train(FromStr::from_str(args[2]).expect("bad size"),
                       folding);
             }
         }
-        ~"problems" => problems(),
+        ~"faketrain" => {
+            let progs = do args.slice_from(2).iter().transform |string| {
+                use parse::Parse;
+                string.parse()
+            }.collect();
+
+            faketrain(progs)
+        }
+        ~"problems" => {
+            let count = if args.len() == 3 {
+                FromStr::from_str(args[2]).expect("bad count")
+            } else {
+                1_000_000_000 // run forever
+            };
+            problems(count)
+        }
         ~"showprobs" => show_problems(),
         _ => println("error: unknown command"),
     }
@@ -79,7 +94,26 @@ fn train(size: u8, operator: TrainOperator) {
     }
 }
 
-fn problems() {
+fn faketrain(progs: ~[program::Program]) {
+    let mut api = FakeApi::new(progs);
+    let mut stats = Statistics::new();
+    let mut rng = seeded_rng();
+    let mut gen = RandomGen::blank();
+
+    while api.has_programs() {
+        // the args are ignored anyway
+        let prob = api.get_training_blocking(0, Empty);
+
+        printfln!("FAKETRAIN: -- %u -- %s -- %s",
+                  prob.problem.size as uint,
+                  prob.problem.operators.to_str(),
+                  prob.problem.id);
+
+        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
+    }
+}
+
+fn problems(count: uint) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
     let mut rng = seeded_rng();
@@ -91,14 +125,15 @@ fn problems() {
         .collect();
     sort::tim_sort(unsolved_probs);
 
-    for prob in unsolved_probs.consume_iter() {
+    for prob in unsolved_probs.consume_iter().take_(count) {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
 
         solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
     }
 }
 
-fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statistics, rng: &mut R, gen: &mut RandomGen) {
+fn solve_problem<R: Rng, A: Api>(problem: Problem, api: &mut A, stats: &mut Statistics,
+                                 rng: &mut R, gen: &mut RandomGen) {
     let pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
 
     stats.start();
@@ -229,7 +264,7 @@ fn seeded_rng() -> XorShiftRng {
         seed_rng.gen::<u32>())
 }
 
-fn fetch_n_random_testcases<R: Rng>(p: Problem, n: uint, api: &mut WebApi, rng: &mut R)
+fn fetch_n_random_testcases<R: Rng, A: Api>(p: Problem, n: uint, api: &mut A, rng: &mut R)
     -> ~[(u64, u64)] {
     let tests = std::vec::from_fn(n, |_| rng.gen());
 

@@ -2,7 +2,9 @@ use program::*;
 
 use std::cell::Cell;
 use std::comm;
+use std::hashmap::HashMap;
 use std::io::ReaderUtil;
+use std::rand;
 use std::run::{Process, ProcessOptions};
 use std::rt::rtio::RtioTimer;
 use std::rt::io::timer::Timer;
@@ -10,6 +12,7 @@ use std::str;
 use std::task;
 use std::to_str::ToStr;
 use std::num::{FromStrRadix,ToStrRadix};
+use std::util;
 use extra::json;
 use extra::json::{Json, ToJson, Object, Number, String, List, Boolean};
 use extra::time;
@@ -20,6 +23,28 @@ static SERVER: &'static str = "http://icfpc2013.cloudapp.net/";
 static PRIVATE_KEY: &'static str = include_str!("private.key");
 
 pub struct WebApi(Chan<Request>);
+
+pub trait Api {
+    fn get_training(&mut self, size: u8, operator: TrainOperator) -> Port<TrainProblem>;
+    fn get_training_blocking(&mut self, size: u8, operator: TrainOperator) -> TrainProblem {
+        self.get_training(size, operator).recv()
+    }
+
+    fn get_problems(&mut self) -> Port<~[RealProblem]>;
+    fn get_problems_blocking(&mut self) -> ~[RealProblem] {
+        self.get_problems().recv()
+    }
+
+    fn eval(&mut self, problem: Problem, inputs: ~[u64]) -> Port<Option<~[u64]>>;
+    fn eval_blocking(&mut self, problem: Problem, inputs: ~[u64]) -> Option<~[u64]> {
+        self.eval(problem, inputs).recv()
+    }
+
+    fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult>;
+    fn guess_blocking(&mut self, problem: Problem, program: ~str) -> GuessResult {
+        self.guess(problem, program).recv()
+    }
+}
 
 impl WebApi {
     pub fn new() -> WebApi {
@@ -81,16 +106,12 @@ impl WebApi {
         let port = self.get_status();
         port.recv()
     }
-
+}
+impl Api for WebApi {
     pub fn get_training(&mut self, size: u8, operator: TrainOperator) -> Port<TrainProblem> {
         let (port, chan) = comm::stream();
         (**self).send(Train(size, operator, chan));
         port
-    }
-
-    pub fn get_training_blocking(&mut self, size: u8, operator: TrainOperator) -> TrainProblem {
-        let port = self.get_training(size, operator);
-        port.recv()
     }
 
     pub fn get_problems(&mut self) -> Port<~[RealProblem]> {
@@ -99,20 +120,10 @@ impl WebApi {
         port
     }
 
-    pub fn get_problems_blocking(&mut self) -> ~[RealProblem] {
-        let port = self.get_problems();
-        port.recv()
-    }
-
     pub fn eval(&mut self, problem: Problem, inputs: ~[u64]) -> Port<Option<~[u64]>> {
         let (port, chan) = comm::stream();
         (**self).send(Eval(problem, inputs, chan));
         port
-    }
-
-    pub fn eval_blocking(&mut self, problem: Problem, inputs: ~[u64]) -> Option<~[u64]> {
-        let port = self.eval(problem, inputs);
-        port.recv()
     }
 
     pub fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult> {
@@ -120,10 +131,108 @@ impl WebApi {
         (**self).send(Guess(problem, program, chan));
         port
     }
+}
 
-    pub fn guess_blocking(&mut self, problem: Problem, program: ~str) -> GuessResult {
-        let port = self.guess(problem, program);
-        port.recv()
+pub struct FakeApi {
+    programs: ~[Program],
+    // for checking answers
+    by_str: HashMap<~str, Program>
+}
+
+impl FakeApi {
+    pub fn new(progs: ~[Program]) -> FakeApi {
+        // this copies every program, but it shouldn't matter much at
+        // all: only run once.
+        let by_str = progs.iter().transform(|p| (p.to_str(), p.clone())).collect();
+        FakeApi {
+            programs: progs,
+            by_str: by_str
+        }
+    }
+
+    fn get_prog<'a>(&'a self, id: &str) -> &'a Program {
+        self.by_str.find_equiv(&id).expect(fmt!("unknown problem id %s", id))
+    }
+
+    pub fn has_programs(&self) -> bool {
+        !self.programs.is_empty()
+    }
+}
+
+impl Api for FakeApi {
+    pub fn get_training(&mut self, _size: u8, _operator: TrainOperator) -> Port<TrainProblem> {
+        let prog = self.programs.shift();
+        let prog_str = prog.to_str();
+
+        let tp = TrainProblem {
+            challenge: prog_str.clone(),
+            problem: Problem {
+                id: prog_str,
+                size: prog.len(),
+                operators: prog.operators()
+            }
+        };
+
+        let (port, chan) = comm::stream();
+        chan.send(tp);
+        port
+    }
+
+    pub fn get_problems(&mut self) -> Port<~[RealProblem]> {
+        let mut progs = ~[];
+        util::swap(&mut progs, &mut self.programs);
+
+        let real_probs = do progs.consume_iter().transform |p| {
+            RealProblem {
+                problem: Problem {
+                    id: p.to_str(),
+                    size: p.len(),
+                    operators: p.operators()
+                },
+                time_left: None,
+                solved: false
+            }
+        }.collect();
+
+        let (port, chan) = comm::stream();
+        chan.send(real_probs);
+        port
+    }
+
+    pub fn eval(&mut self, problem: Problem, inputs: ~[u64]) -> Port<Option<~[u64]>> {
+        let prog = self.get_prog(problem.id);
+
+        let outs = do inputs.consume_iter().transform |x| {
+            prog.eval(x)
+        }.collect();
+
+        let (port, chan) = comm::stream();
+        chan.send(Some(outs));
+        port
+    }
+
+    pub fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult> {
+        use compile::compile_program;
+        use parse::Parse;
+
+        let parsed = compile_program(&program.parse());
+        let real = compile_program(self.get_prog(problem.id));
+        let mut rng = rand::task_rng();
+
+        let mut result = Win;
+        for _ in range(0, 100000) {
+            let x = rng.gen();
+            let test = parsed.eval(x);
+            let expected = real.eval(x);
+            if test != expected {
+                result = Mismatch(x, expected, test);
+                break
+            }
+        }
+
+        let (port, chan) = comm::stream();
+        chan.send(result);
+        port
     }
 }
 

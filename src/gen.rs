@@ -108,7 +108,7 @@ impl RandomGenState {
             seed_rng.gen::<u32>(),
             seed_rng.gen::<u32>(),
             seed_rng.gen::<u32>());
-        
+
         let op1_choices: ~[UnaOp] = (~[Not, Shl1, Shr1, Shr4, Shr16]).consume_iter()
             .filter(|o| o.in_ops(&problem.operators))
             .collect();
@@ -223,7 +223,7 @@ impl RandomGenState {
                 let spaces = size - 1;
                 let spaces_choose_2 = spaces * (spaces - 1) / 2;
                 let mut choices = self.op1_len + (self.op2_len * (spaces - 1));
-                if self.operators.if0 { 
+                if self.operators.if0 {
                     choices += spaces_choose_2;
                 }
                 if foldable && !root {
