@@ -210,7 +210,7 @@ impl RandomGenState {
                         let expr = self.gen_expr(3, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
-                    n if n < self.op2_len * 2 => {
+                    n if n < self.op1_len + self.op2_len * 2 => {
                         let left_bigger = self.rng.gen::<bool>();
                         let (left_size, right_size) = if left_bigger {
                             (2, 1)
