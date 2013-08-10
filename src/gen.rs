@@ -73,6 +73,7 @@ impl NaiveGen {
                     gen.reset(max_size, operations, constraints);
                 }
                 Some(MoreConstraints(c)) => {
+                    info!("adding new constraints: %?", c);
                     gen.constraints.push_all_move(c)
                 }
                 Some(Generate(chan)) => {
@@ -129,16 +130,34 @@ impl NaiveGenState {
         self.constraints = constraints;
         self.size = 0;
     }
+
+    fn gen_tfold(&mut self) -> Expr {
+        // remove this, because it gets shadowed and so should
+        // never be referred to.
+        let main_id = self.scope_stack.shift();
+        Fold {
+            foldee: ~Ident(main_id),
+            init: ~Zero,
+            next_id: self.gen_sym(),
+            accum_id: self.gen_sym(),
+            body: ~self.gen_expr(true, false)
+        }
+    }
 }
 
 impl Generator for NaiveGenState {
     pub fn gen_sym(&mut self) -> Id {
         let num = self.next_symbol;
         self.next_symbol += 1;
+        self.scope_stack.push(num as uint);
         num as uint
     }
 
     pub fn gen_expr(&mut self, used_fold: bool, top_level: bool) -> Expr {
+        if top_level && self.operations.tfold {
+            return self.gen_tfold();
+        }
+
         let this_vec = self.rng.shuffle(self.operator_choice_vec);
         let mut i = 0;
         loop {
@@ -193,25 +212,15 @@ impl Generator for NaiveGenState {
                     i += 1;
                     loop;
                 }
-                6 => { // fold
-                    let op_ok = if self.operations.tfold {
-                        top_level    
-                    } else {
-                        !used_fold && self.operations.fold
-                    };
+                6 => { // fold; no need to special case tfold here,
+                       // this check handles that:
+                    let op_ok = !used_fold && self.operations.fold;
                     if op_ok && self.size + 5 <= self.max_size {
                         self.size += 2;
                         let foldee = self.gen_expr(true, false);
-                        let init = if top_level {
-                            Zero // always 0 in a tfold
-                        } else {
-                            self.gen_expr(true, false)
-                        };
+                        let init = self.gen_expr(true, false);
                         let next_id = self.gen_sym();
                         let accum_id = self.gen_sym();
-
-                        self.scope_stack.push(next_id);
-                        self.scope_stack.push(accum_id);
 
                         let body = self.gen_expr(true, false);
 
@@ -236,7 +245,6 @@ impl Generator for NaiveGenState {
 
     pub fn gen_prog(&mut self) -> Program {
         let sym = self.gen_sym();
-        self.scope_stack.push(sym);
         self.size += 1;
         let expr = self.gen_expr(false, true);
         self.scope_stack.clear();
