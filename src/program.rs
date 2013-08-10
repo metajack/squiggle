@@ -115,8 +115,9 @@ pub static OP_SHL1: uint = 1;
 pub static OP_SHR1: uint = 2;
 pub static OP_SHR4: uint = 3;
 pub static OP_SHR16: uint = 4;
+pub static OP1_CHOICE: [UnaOp, ..5] = [Not, Shl1, Shr1, Shr4, Shr16];
 
-#[deriving(Rand,Eq,IterBytes)]
+#[deriving(Clone,Rand,Eq,IterBytes)]
 pub enum UnaOp {
     Not,
     Shl1,
@@ -141,8 +142,9 @@ pub static OP_AND: uint = 0;
 pub static OP_OR: uint = 1;
 pub static OP_XOR: uint = 2;
 pub static OP_PLUS: uint = 3;
+pub static OP2_CHOICE: [BinOp, ..4] = [And, Or, Xor, Plus];
 
-#[deriving(Rand,Eq,IterBytes)]
+#[deriving(Clone,Rand,Eq,IterBytes)]
 pub enum BinOp {
     And,
     Or,

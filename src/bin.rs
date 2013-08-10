@@ -99,7 +99,7 @@ fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statist
     let pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
 
     stats.start();
-    let mut gen = NaiveGen::new(problem.size, problem.operators, pairs);
+    let mut gen = RandomGen::new(problem.clone(), pairs);
 
     'next_candidate: loop {
         let candidate = gen.next();
