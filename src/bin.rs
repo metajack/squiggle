@@ -72,6 +72,7 @@ fn train(size: u8, operator: TrainOperator) {
                   prob.problem.size as uint,
                   prob.problem.operators.to_str(),
                   prob.problem.id);
+        printfln!("GOLD: %s", prob.challenge);
 
         solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
     }
