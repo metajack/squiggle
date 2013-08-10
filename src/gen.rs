@@ -145,20 +145,22 @@ impl RandomGenState {
         // remove the size of each program (1)
         size -= 1;
 
-        let expr = if self.operators.tfold {
+        if self.operators.tfold {
             // remove the sizes of fold, x and 0
             let body = ~self.gen_expr(size - 2 - 1 - 1, 2, false);
-            Fold {
-                foldee: ~Ident(0),
-                init: ~Zero,
-                accum_id: 0,
-                next_id: 1,
-                body: body
-            }
+
+            // use 2 here, because it won't be referred to in the body
+            // ever. i.e. it's shadowed.
+            Program::new(2, ~Fold {
+                    foldee: ~Ident(2),
+                    init: ~Zero,
+                    accum_id: 0,
+                    next_id: 1,
+                    body: body
+                })
         } else {
-            self.gen_expr(size, 1, self.operators.fold)
-        };
-        Program::new(0, ~expr)
+            Program::new(0, ~self.gen_expr(size, 1, self.operators.fold))
+        }
     }
 
     fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {
