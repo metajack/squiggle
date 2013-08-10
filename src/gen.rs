@@ -6,6 +6,10 @@ use std::comm;
 use std::comm::{Port, Chan};
 use std::rand::{Rng, RngUtil, XorShiftRng, task_rng};
 use std::task;
+use extra::arc;
+
+static PARALLELISM: uint = 1;
+static CHECK_EVERY: uint = 1024;
 
 pub enum GenMsg {
     Generate(Chan<~Program>),
@@ -67,24 +71,57 @@ impl RandomGen {
                     constraints.push_all_move(c)
                 }
                 Some(Generate(chan)) => {
-                    let mut i = 0;
-                    'newprog: loop {
-                        let prog = gen.gen_program(problem.size as uint);
-                        i += 1;
-                        for &(x, y) in constraints.iter() {
-                            if prog.eval(x) != y {
-                                if i % 1000000 == 0 {
-                                    printfln!("gen stats: searched for %u iters", i);
+                    let (inner_port, inner_chan) = stream();
+                    let inner_chan = comm::SharedChan::new(inner_chan);
+                    let stop_arc = arc::RWArc::new(false);
+                    let problem_size = problem.size as uint;
+
+                    for task_num in range(0, PARALLELISM) {
+                        let task_chan = inner_chan.clone();
+                        let task_stop_arc = stop_arc.clone();
+                        let task_gen = Cell::new(gen.clone());
+                        let task_constraints = constraints.clone();
+
+                        do spawn {
+                            let mut task_gen = task_gen.take();
+
+                            let mut i = 0;
+                            'newprog: loop {
+                                i += 1;
+                                if i % CHECK_EVERY == 0 {
+                                    if task_stop_arc.read(|&stop| stop) {
+                                        printfln!("task %u: someone else found it", task_num);
+                                        break
+                                    }
+
+                                    // required for any parallelism at all.
+                                    task::yield();
                                 }
-                                loop 'newprog;
+
+                                let prog = task_gen.gen_program(problem_size);
+
+                                if task_constraints.iter().any(|&(x,y)| prog.eval(x) != y) {
+                                    if i % 1000000 == 0 {
+                                        printfln!("gen stats: task %u: searched for %u iters",
+                                                  task_num, i);
+                                    }
+                                    loop 'newprog;
+                                }
+                                if i > 1 {
+                                    printfln!("gen stats: task %u: candidate took %u iters",
+                                              task_num, i);
+                                }
+
+                                task_chan.send(~prog);
+                                break;
                             }
                         }
-                        if i > 1 {
-                            printfln!("gen stats: candidate took %u iters", i);
-                        }
-                        chan.send(~prog);
-                        break;
                     }
+
+                    let prog = inner_port.recv();
+                    stop_arc.write(|stop| *stop = true);
+
+                    chan.send(prog);
                 }
             }
         }
@@ -100,14 +137,31 @@ struct RandomGenState {
     op2_choices: ~[BinOp],
 }
 
+impl Clone for RandomGenState {
+    fn clone(&self) -> RandomGenState {
+        RandomGenState {
+            rng: seeded_rng(), // need a new rng
+            operators: self.operators.clone(),
+            op1_len: self.op1_len,
+            op1_choices: self.op1_choices.clone(),
+            op2_len: self.op2_len,
+            op2_choices: self.op2_choices.clone(),
+        }
+    }
+}
+
+fn seeded_rng() -> XorShiftRng {
+    let mut seed_rng = task_rng();
+    XorShiftRng::new_seeded(seed_rng.gen::<u32>(),
+                            seed_rng.gen::<u32>(),
+                            seed_rng.gen::<u32>(),
+                            seed_rng.gen::<u32>())
+}
+
+
 impl RandomGenState {
     fn new(problem: Problem) -> RandomGenState {
-        let mut seed_rng = task_rng();
-        let rng = XorShiftRng::new_seeded(
-            seed_rng.gen::<u32>(),
-            seed_rng.gen::<u32>(),
-            seed_rng.gen::<u32>(),
-            seed_rng.gen::<u32>());
+        let rng = seeded_rng();
 
         let op1_choices: ~[UnaOp] = (~[Not, Shl1, Shr1, Shr4, Shr16]).consume_iter()
             .filter(|o| o.in_ops(&problem.operators))
