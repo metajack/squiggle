@@ -299,7 +299,7 @@ impl StatusResponse {
                 let mismatches = get_json_num(*obj, ~"mismatches");
                 let num_requests = get_json_num(*obj, ~"numRequests");
                 let cpu_total_time = get_json_num(*obj, ~"cpuTotalTime");
-                
+
                 let request_window = match obj.find(&~"requestWindow") {
                     Some(win_data) => Window::from_json(win_data.clone()),
                     _ => fail!("bad requestWindow"),
@@ -387,8 +387,19 @@ trait WebEval {
 
         match get_json_str(response, ~"status") {
             ~"win" => Win,
-            ~"mismatch" => fail!(),
-            _ => fail!()
+            ~"mismatch" => {
+                let vals = get_json_array(response, ~"values");
+                assert!(vals.len() == 3, "not enough values in guess.mismatch");
+                let mut parsed = do vals.iter().transform |s| {
+                    read_0x_hex(unwrap_json_str(s))
+                };
+                Mismatch(parsed.next().unwrap(),
+                         parsed.next().unwrap(),
+                         parsed.next().unwrap())
+            }
+            _ => {
+                Error(get_json_str(response, ~"message"))
+            }
         }
     }
     fn eval(&self, nums: &[u64]) -> Option<~[u64]> {
@@ -407,18 +418,24 @@ trait WebEval {
         if "ok" == get_json_str(response, ~"status") {
             let outs = get_json_array(response, ~"outputs");
             Some(do outs.iter().transform |j| {
-                    match *j {
-                        String(ref s) => {
-                            let no_0x = s.slice_from(2);
-                            FromStrRadix::from_str_radix::<u64>(no_0x, 16).expect("not a hex number")
-                        }
-                        _ => fail!("non string in eval.outputs")
-                    }
+                    read_0x_hex(unwrap_json_str(j))
                 }.to_owned_vec())
         } else {
             println(get_json_str(response, ~"message"));
             None
         }
+    }
+}
+
+fn read_0x_hex(s: &str) -> u64 {
+    let no_0x = s.slice_from(2);
+    FromStrRadix::from_str_radix::<u64>(no_0x, 16).expect("not a hex number")
+}
+
+fn unwrap_json_str<'a>(json: &'a Json) -> &'a str {
+    match *json {
+        String(ref s) => s.as_slice(),
+        _ => fail!("non string")
     }
 }
 

@@ -10,7 +10,7 @@ use gen::*;
 use webapi::*;
 
 use std::os;
-use std::rand::{RngUtil, XorShiftRng};
+use std::rand::{Rng, RngUtil, XorShiftRng};
 use std::vec;
 use extra::sort;
 use extra::time;
@@ -56,23 +56,7 @@ fn train(size: u8, operator: TrainOperator) {
         let prob = api.get_training_blocking(size, operator);
         printfln!("TRAIN: %s (%u)", prob.problem.id, prob.problem.size as uint);
 
-        let mut tests = ~[];
-        for _ in range(0, 50) {
-            tests.push(rng.gen::<u64>());
-        }
-
-        let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
-        let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
-
-        stats.start();
-        let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
-
-        let candidate = gen.next();
-        stats.end();
-
-        println(candidate.to_str());
-        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()));
-        stats.report();
+        solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
     }
 }
 
@@ -87,27 +71,46 @@ fn problems() {
         .collect();
     sort::tim_sort(unsolved_probs);
 
-    for prob in unsolved_probs.iter() {
+    for prob in unsolved_probs.consume_iter() {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
+        if prob.problem.size <= 9 { loop }
 
-        let mut tests = ~[];
-        for _ in range(0, 50) {
-            tests.push(rng.gen::<u64>());
-        }
+        solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
+    }
+}
 
-        let constraints = api.eval_blocking(prob.problem.clone(), tests.clone()).expect("coulnd't eval tests");
-        let pairs = tests.consume_iter().zip(constraints.consume_iter()).collect();
+fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statistics, rng: &mut R) {
+    let pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
 
-        stats.start();
-        let mut gen = NaiveGen::new(prob.problem.size, prob.problem.operators, pairs);
+    stats.start();
+    let mut gen = NaiveGen::new(problem.size, problem.operators, pairs);
 
+    'next_candidate: loop {
         let candidate = gen.next();
-        stats.end();
 
         println(candidate.to_str());
-        printfln!(api.guess_blocking(prob.problem.clone(), candidate.to_str()));
-        stats.report();
+        info!(candidate);
+        match api.guess_blocking(problem.clone(), candidate.to_str()) {
+            Win => {
+                println("win!");
+                break 'next_candidate;
+            }
+            Mismatch(input, real, ours) => {
+                printfln!("P(%?) == %? != %?", input, real, ours);
+
+                let mut pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
+                pairs.push((input, real));
+
+                gen.more_constraints(pairs);
+                loop 'next_candidate;
+            }
+            Error(s) => {
+                printfln!("Error occured: %s", s);
+            }
+        }
     }
+    stats.end();
+    stats.report();
 }
 
 struct Statistics {
@@ -161,4 +164,13 @@ fn seeded_rng() -> XorShiftRng {
         seed_rng.gen::<u32>(),
         seed_rng.gen::<u32>(),
         seed_rng.gen::<u32>())
+}
+
+fn fetch_n_random_testcases<R: Rng>(p: Problem, n: uint, api: &mut WebApi, rng: &mut R)
+    -> ~[(u64, u64)] {
+    let tests = std::vec::from_fn(n, |_| rng.gen());
+
+    let constraints = api.eval_blocking(p, tests.clone()).expect("coulnd't eval tests");
+
+    tests.consume_iter().zip(constraints.consume_iter()).collect()
 }
