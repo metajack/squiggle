@@ -65,6 +65,7 @@ fn train(size: u8, operator: TrainOperator) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
     let mut rng = seeded_rng();
+    let mut gen = RandomGen::blank();
 
     loop {
         let prob = api.get_training_blocking(size, operator);
@@ -74,7 +75,7 @@ fn train(size: u8, operator: TrainOperator) {
                   prob.problem.id);
         printfln!("GOLD: %s", prob.challenge);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
+        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
     }
 }
 
@@ -82,6 +83,7 @@ fn problems() {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
     let mut rng = seeded_rng();
+    let mut gen = RandomGen::blank();
 
     let probs = api.get_problems_blocking();
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter()
@@ -92,15 +94,15 @@ fn problems() {
     for prob in unsolved_probs.consume_iter() {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
+        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
     }
 }
 
-fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statistics, rng: &mut R) {
+fn solve_problem<R: Rng>(problem: Problem, api: &mut WebApi, stats: &mut Statistics, rng: &mut R, gen: &mut RandomGen) {
     let pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
 
     stats.start();
-    let mut gen = RandomGen::new(problem.clone(), pairs);
+    gen.reset(problem.clone(), pairs);
 
     'next_candidate: loop {
         let candidate = gen.next();

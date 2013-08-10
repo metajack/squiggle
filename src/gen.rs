@@ -9,6 +9,7 @@ use std::task;
 
 pub enum GenMsg {
     Generate(Chan<~Program>),
+    Reset(Problem, ~[(u64, u64)]),
     MoreConstraints(~[(u64, u64)]),
     Exit,
 }
@@ -27,6 +28,20 @@ impl RandomGen {
         RandomGen(chan)
     }
 
+    pub fn blank() -> RandomGen {
+        RandomGen::new(
+            Problem {
+                size: 3,
+                operators: OperatorSet::new(),
+                id: ~"",
+            },
+            ~[])
+    }
+
+    pub fn reset(&mut self, problem: Problem, constraints: ~[(u64, u64)]) {
+        (**self).send(Reset(problem, constraints));
+    }
+
     pub fn next(&mut self) -> ~Program {
         let (port, chan) = comm::stream();
         (**self).send(Generate(chan));
@@ -37,12 +52,17 @@ impl RandomGen {
         (**self).send(MoreConstraints(cs));
     }
 
-    fn generate(problem: Problem, mut constraints: ~[(u64, u64)], port: Port<GenMsg>) {
+    fn generate(mut problem: Problem, mut constraints: ~[(u64, u64)], port: Port<GenMsg>) {
         let mut gen = RandomGenState::new(problem.clone());
         loop {
             match port.try_recv() {
                 None => break,
                 Some(Exit) => break,
+                Some(Reset(p, c)) => {
+                    constraints = c;
+                    gen.reset(p.clone());
+                    problem = p;
+                }
                 Some(MoreConstraints(c)) => {
                     constraints.push_all_move(c)
                 }
@@ -104,6 +124,21 @@ impl RandomGenState {
             op2_len: op2_choices.len(),
             op2_choices: op2_choices,
         }
+    }
+
+    fn reset(&mut self, problem: Problem) {
+        let op1_choices: ~[UnaOp] = (~[Not, Shl1, Shr1, Shr4, Shr16]).consume_iter()
+            .filter(|o| o.in_ops(&problem.operators))
+            .collect();
+        let op2_choices: ~[BinOp] = (~[And, Or, Xor, Plus]).consume_iter()
+            .filter(|o| o.in_ops(&problem.operators))
+            .collect();
+
+        self.operators = problem.operators;
+        self.op1_len = op1_choices.len();
+        self.op1_choices = op1_choices;
+        self.op2_len = op2_choices.len();
+        self.op2_choices = op2_choices;
     }
 
     fn gen_program(&mut self, size: uint) -> Program {
