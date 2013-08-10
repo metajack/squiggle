@@ -202,7 +202,11 @@ impl Generator for NaiveGenState {
                     if op_ok && self.size + 5 <= self.max_size {
                         self.size += 2;
                         let foldee = self.gen_expr(true, false);
-                        let init = self.gen_expr(true, false);
+                        let init = if top_level {
+                            Zero // always 0 in a tfold
+                        } else {
+                            self.gen_expr(true, false)
+                        };
                         let next_id = self.gen_sym();
                         let accum_id = self.gen_sym();
 
