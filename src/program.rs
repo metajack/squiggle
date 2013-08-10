@@ -20,6 +20,7 @@ pub struct OperatorSet {
     if0: bool,
     fold: bool,
     tfold: bool,
+    bonus: bool,
 }
 
 impl OperatorSet {
@@ -30,6 +31,7 @@ impl OperatorSet {
             if0: false,
             fold: false,
             tfold: false,
+            bonus: false,
         }
     }
 
@@ -48,7 +50,8 @@ impl OperatorSet {
                 ~"if0" => self.if0 = true,
                 ~"fold" => self.fold = true,
                 ~"tfold" => self.tfold = true,
-                _ => fail!("bad operation"),
+                ~"bonus" => self.bonus = true,
+                _ => fail!(fmt!("bad operation %s", *op)),
             }
         }
     }
