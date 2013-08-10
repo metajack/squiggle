@@ -10,7 +10,7 @@ use gen::*;
 use webapi::*;
 
 use std::os;
-use std::rand::{Rng, RngUtil, XorShiftRng};
+use std::rand::{Rng, RngUtil};
 use std::vec;
 use extra::sort;
 use extra::time;
@@ -79,7 +79,6 @@ fn status() {
 fn train(size: u8, operator: TrainOperator) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
-    let mut rng = seeded_rng();
     let mut gen = RandomGen::blank();
 
     loop {
@@ -90,14 +89,13 @@ fn train(size: u8, operator: TrainOperator) {
                   prob.problem.id);
         printfln!("GOLD: %s", prob.challenge);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
+        solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
     }
 }
 
 fn faketrain(progs: ~[program::Program]) {
     let mut api = FakeApi::new(progs);
     let mut stats = Statistics::new();
-    let mut rng = seeded_rng();
     let mut gen = RandomGen::blank();
 
     while api.has_programs() {
@@ -109,14 +107,13 @@ fn faketrain(progs: ~[program::Program]) {
                   prob.problem.operators.to_str(),
                   prob.problem.id);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
+        solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
     }
 }
 
 fn problems(count: uint) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
-    let mut rng = seeded_rng();
     let mut gen = RandomGen::blank();
 
     let probs = api.get_problems_blocking();
@@ -128,13 +125,13 @@ fn problems(count: uint) {
     for prob in unsolved_probs.consume_iter().take_(count) {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut rng, &mut gen);
+        solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
     }
 }
 
-fn solve_problem<R: Rng, A: Api>(problem: Problem, api: &mut A, stats: &mut Statistics,
-                                 rng: &mut R, gen: &mut RandomGen) {
-    let pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
+fn solve_problem<A: Api>(problem: Problem, api: &mut A, stats: &mut Statistics,
+                         gen: &mut RandomGen) {
+    let pairs = fetch_n_random_testcases(problem.clone(), 50, api);
 
     stats.start();
     gen.reset(problem.clone(), pairs);
@@ -152,7 +149,7 @@ fn solve_problem<R: Rng, A: Api>(problem: Problem, api: &mut A, stats: &mut Stat
             Mismatch(input, real, ours) => {
                 printfln!("P(%?) == %? != %?", input, real, ours);
 
-                let mut pairs = fetch_n_random_testcases(problem.clone(), 50, api, rng);
+                let mut pairs = fetch_n_random_testcases(problem.clone(), 50, api);
                 pairs.push((input, real));
 
                 gen.more_constraints(pairs);
@@ -255,17 +252,8 @@ impl Statistics {
     }
 }
 
-fn seeded_rng() -> XorShiftRng {
-    let mut seed_rng = std::rand::task_rng();
-    XorShiftRng::new_seeded(
-        seed_rng.gen::<u32>(),
-        seed_rng.gen::<u32>(),
-        seed_rng.gen::<u32>(),
-        seed_rng.gen::<u32>())
-}
-
-fn fetch_n_random_testcases<R: Rng, A: Api>(p: Problem, n: uint, api: &mut A, rng: &mut R)
-    -> ~[(u64, u64)] {
+fn fetch_n_random_testcases<A: Api>(p: Problem, n: uint, api: &mut A) -> ~[(u64, u64)] {
+    let mut rng = std::rand::task_rng();
     let tests = std::vec::from_fn(n, |_| rng.gen());
 
     let constraints = api.eval_blocking(p, tests.clone()).expect("coulnd't eval tests");
