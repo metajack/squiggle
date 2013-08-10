@@ -73,7 +73,6 @@ fn problems() {
 
     for prob in unsolved_probs.consume_iter() {
         printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
-        if prob.problem.size <= 9 { loop }
 
         solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
     }
