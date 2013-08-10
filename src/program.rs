@@ -57,25 +57,21 @@ impl OperatorSet {
         match *e {
             Op1(op, ~ref sub_e) => {
                 self.op1[op as uint] = true;
-                println("op1");
                 self.add_from_expr(sub_e)
             }
             Op2(op, ~ref lhs, ~ref rhs) => {
                 self.op2[op as uint] = true;
-                println("op2");
                 self.add_from_expr(lhs);
                 self.add_from_expr(rhs);
             }
             If0(~ref c, ~ref t, ~ref e) => {
                 self.if0 = true;
-                println("if0");
                 self.add_from_expr(c);
                 self.add_from_expr(t);
                 self.add_from_expr(e);
             }
             Fold {foldee: ~ref foldee, init: ~ref init, body: ~ref body, _ } => {
                 self.fold = true;
-                println("fold");
                 self.add_from_expr(foldee);
                 self.add_from_expr(init);
                 self.add_from_expr(body);
