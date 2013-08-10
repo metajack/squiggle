@@ -29,6 +29,7 @@ pub struct NaiveGenState {
     next_symbol: u8,
     max_size: u8,
     operations: OperatorSet,
+    operator_choice_vec: ~[uint],
     constraints: ~[(u64, u64)],
     size: u8,
 }
@@ -113,6 +114,7 @@ impl NaiveGenState {
             next_symbol: 0,
             max_size: 30,
             operations: OperatorSet::new(),
+            operator_choice_vec: ~[0,1,2,3,4,5,6],
             constraints: ~[],
             size: 0,
         }
@@ -137,8 +139,10 @@ impl Generator for NaiveGenState {
     }
 
     pub fn gen_expr(&mut self, used_fold: bool, top_level: bool) -> Expr {
+        let this_vec = self.rng.shuffle(self.operator_choice_vec);
+        let mut i = 0;
         loop {
-            let choice = self.rng.gen_uint_range(0, 7);
+            let choice = this_vec[i];
             match choice {
                 0 => {
                     self.size += 1;
@@ -161,6 +165,7 @@ impl Generator for NaiveGenState {
                         let other = self.gen_expr(used_fold, false);
                         return If0(~test, ~then, ~other);
                     }
+                    i += 1;
                     loop;
                 }
                 4 => { // op1
@@ -172,6 +177,7 @@ impl Generator for NaiveGenState {
                             return Op1(op, ~expr);
                         }
                     }
+                    i += 1;
                     loop;
                 }
                 5 => { // op2
@@ -184,6 +190,7 @@ impl Generator for NaiveGenState {
                             return Op2(op, ~left, ~right);
                         }
                     }
+                    i += 1;
                     loop;
                 }
                 6 => { // fold
@@ -215,6 +222,7 @@ impl Generator for NaiveGenState {
                             body: ~body,
                         };
                     }
+                    i += 1;
                     loop;
                 }
                 _ => fail!(~"unexpected random value"),
