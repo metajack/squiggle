@@ -31,10 +31,23 @@ fn main() {
     match args[1] {
         ~"status" => status(),
         ~"train" => {
-            if args.len() != 3 {
+            if args.len() < 3 {
                 println("error: missing training size");
             } else {
-                train(FromStr::from_str(args[2]).expect("bad size"), Empty);
+                let folding = if args.len() == 4 {
+                    match args[3] {
+                        ~"fold" => Fold,
+                        ~"tfold" => Tfold,
+                        _ => {
+                            println("error: bad folding value, using no folds");
+                            Empty
+                        }
+                    }
+                } else {
+                    Empty
+                };
+                train(FromStr::from_str(args[2]).expect("bad size"), 
+                      folding);
             }
         }
         ~"problems" => problems(),
@@ -55,7 +68,10 @@ fn train(size: u8, operator: TrainOperator) {
 
     loop {
         let prob = api.get_training_blocking(size, operator);
-        printfln!("TRAIN: %s (%u)", prob.problem.id, prob.problem.size as uint);
+        printfln!("TRAIN: -- %u -- %s -- %s",
+                  prob.problem.size as uint,
+                  prob.problem.operators.to_str(),
+                  prob.problem.id);
 
         solve_problem(prob.problem, &mut api, &mut stats, &mut rng);
     }
