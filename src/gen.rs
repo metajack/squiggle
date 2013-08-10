@@ -339,7 +339,6 @@ impl RandomGenState {
 
                 let have_unaops = self.op1_len > 0;
                 let have_if0 = self.operators.if0;
-                let have_if0_or_fold = self.operators.if0 || foldable;
 
                 // we can't generate even sized binops without unaops or if
                 let gen_binop = have_unaops || size.is_odd() || have_if0;
@@ -350,6 +349,7 @@ impl RandomGenState {
                 // we can't generate size=5,6 if0s without unaops as it will
                 // force a size=2. size=4 is handled by previous match arm.
                 let gen_if = have_if0 && (have_unaops || size > 6);
+                //printfln!("can gen if? %b", gen_if);
 
                 // we can't generate size=6,7 folds without unaops as it will
                 // force a size=2. we also can only gen size=8,10 if we have if0
@@ -519,8 +519,9 @@ impl RandomGenState {
             }
         }
             
-        // We have fold/if0, so prevent 6.
-        if choice == 6 {
+        // We have fold/if0, so prevent 6 and 2. 6 causes a slot of 2, and 2
+        // is not allowed because of missing unaops
+        if choice == 6 || choice == 2 {
             if space > choice && self.rng.gen() {
                 return choice + 1;
             } else {
@@ -545,12 +546,15 @@ impl RandomGenState {
     //
     // Check the rules above for a size. This is needed for leftover slots.
     fn check_size(&mut self, choice: uint, foldable: bool) -> bool {
+        //printfln!("check_size(%u)", choice);
         let have_unaops = self.op1_len > 0;
         let have_fold_or_if0 = foldable || self.operators.if0;
 
         if have_unaops { return true; }
         if !have_fold_or_if0 && choice.is_even() { return false; }
-        choice != 6
+
+        // 2 is too small for if, so including that
+        choice != 6 && choice != 2
     }
 }
 
@@ -588,7 +592,7 @@ mod tests {
         };
         let mut gen = RandomGen::new(problem, ~[]);
         for _ in range(0, 10) {
-            //gen.next();
+            gen.next();
         }
     }
 
@@ -598,7 +602,7 @@ mod tests {
         opset.add(~[~"and", ~"or", ~"plus", ~"xor", ~"fold"]);
         let problem = Problem {
             id: ~"no_unaops_noif_fold",
-            size: 11,
+            size: 12,
             operators: opset,
         };
         let mut gen = RandomGen::new(problem, ~[]);
