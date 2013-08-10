@@ -173,7 +173,7 @@ impl RandomGenState {
                 // 2. BinOp (op2_len)
                 match self.rng.gen_uint_range(0, self.op1_len + self.op2_len) {
                     n if n < self.op1_len => { // UnaOp
-                        let expr = self.gen_expr(1, idents, foldable, false);
+                        let expr = self.gen_expr(2, idents, foldable, false);
                         Op1(self.op1_choices[n], ~expr)
                     }
                     n => {
