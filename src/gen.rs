@@ -147,7 +147,7 @@ impl RandomGenState {
 
         let expr = if self.operators.tfold {
             // remove the sizes of fold, x and 0
-            let body = ~self.gen_expr(size - 2 - 1 - 1, 2, false, false);
+            let body = ~self.gen_expr(size - 2 - 1 - 1, 2, false);
             Fold {
                 foldee: ~Ident(0),
                 init: ~Zero,
@@ -156,12 +156,12 @@ impl RandomGenState {
                 body: body
             }
         } else {
-            self.gen_expr(size, 1, self.operators.fold, true)
+            self.gen_expr(size, 1, self.operators.fold)
         };
         Program::new(0, ~expr)
     }
 
-    fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool, root: bool) -> Expr {
+    fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {
         match size {
             1 => {
                 // Choices:
@@ -178,7 +178,7 @@ impl RandomGenState {
             2 => {
                 // UnaOp (op1_len)
                 let op = self.rng.choose(self.op1_choices);
-                let expr = self.gen_expr(1, idents, foldable, false);
+                let expr = self.gen_expr(1, idents, foldable);
                 Op1(op, ~expr)
             }
             3 => {
@@ -187,12 +187,12 @@ impl RandomGenState {
                 // 2. BinOp (op2_len)
                 match self.rng.gen_uint_range(0, self.op1_len + self.op2_len) {
                     n if n < self.op1_len => { // UnaOp
-                        let expr = self.gen_expr(2, idents, foldable, false);
+                        let expr = self.gen_expr(2, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
                     n => {
-                        let left = self.gen_expr(1, idents, foldable, false);
-                        let right = self.gen_expr(1, idents, foldable, false);
+                        let left = self.gen_expr(1, idents, foldable);
+                        let right = self.gen_expr(1, idents, foldable);
                         Op2(self.op2_choices[n - self.op1_len], ~left, ~right)
                     }
                 }
@@ -205,7 +205,7 @@ impl RandomGenState {
                 let if_len = if self.operators.if0 { 1 } else { 0 };
                 match self.rng.gen_uint_range(0, self.op1_len + self.op2_len * 2 + if_len) {
                     n if n < self.op1_len => {
-                        let expr = self.gen_expr(3, idents, foldable, false);
+                        let expr = self.gen_expr(3, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
                     n if n < self.op2_len * 2 => {
@@ -215,15 +215,15 @@ impl RandomGenState {
                         } else {
                             (1, 2)
                         };
-                        let left = self.gen_expr(left_size, idents, foldable, false);
-                        let right = self.gen_expr(right_size, idents, foldable, false);
+                        let left = self.gen_expr(left_size, idents, foldable);
+                        let right = self.gen_expr(right_size, idents, foldable);
                         let op = self.rng.gen::<BinOp>();
                         Op2(op, ~left, ~right)
                     }
                     _ => {
-                        let test = self.gen_expr(1, idents, foldable, false);
-                        let then = self.gen_expr(1, idents, foldable, false);
-                        let other = self.gen_expr(1, idents, foldable, false);
+                        let test = self.gen_expr(1, idents, foldable);
+                        let then = self.gen_expr(1, idents, foldable);
+                        let other = self.gen_expr(1, idents, foldable);
                         If0(~test, ~then, ~other)
                     }
                 }
@@ -240,7 +240,7 @@ impl RandomGenState {
                 if self.operators.if0 {
                     choices += spaces_choose_2;
                 }
-                if foldable && !root {
+                if foldable {
                     choices += spaces_choose_2;
                 }
 
@@ -253,14 +253,14 @@ impl RandomGenState {
 
                 match self.rng.gen_uint_range(0, choices) {
                     n if n < self.op1_len => {
-                        let expr = self.gen_expr(size - 1, idents, foldable, false);
+                        let expr = self.gen_expr(size - 1, idents, foldable);
                         Op1(self.op1_choices[n], ~expr)
                     }
                     n if n < op2_end => {
                         let left_size = self.rng.gen_uint_range(1, size - 2);
                         let right_size = size - 1 - left_size;
-                        let left = self.gen_expr(left_size, idents, foldable, false);
-                        let right = self.gen_expr(right_size, idents, foldable, false);
+                        let left = self.gen_expr(left_size, idents, foldable);
+                        let right = self.gen_expr(right_size, idents, foldable);
                         let op = self.rng.gen::<BinOp>();
                         Op2(op, ~left, ~right)
                     }
@@ -269,9 +269,9 @@ impl RandomGenState {
                         let rest = size - 1 - test_size;
                         let then_size = self.rng.gen_uint_range(1, rest - 1);
                         let other_size = size - 1 - test_size - then_size;
-                        let test = self.gen_expr(test_size, idents, foldable, false);
-                        let then = self.gen_expr(then_size, idents, foldable, false);
-                        let other = self.gen_expr(other_size, idents, foldable, false);
+                        let test = self.gen_expr(test_size, idents, foldable);
+                        let then = self.gen_expr(then_size, idents, foldable);
+                        let other = self.gen_expr(other_size, idents, foldable);
                         If0(~test, ~then, ~other)
                     }
                     _ => {
@@ -279,9 +279,9 @@ impl RandomGenState {
                         let rest = size - 1 - foldee_size;
                         let init_size = self.rng.gen_uint_range(1, rest - 1);
                         let body_size = size - 1 - foldee_size - init_size;
-                        let foldee = self.gen_expr(foldee_size, idents, foldable, false);
-                        let init = self.gen_expr(init_size, idents, foldable, false);
-                        let body = self.gen_expr(body_size, idents + 2, foldable, false);
+                        let foldee = self.gen_expr(foldee_size, idents, false);
+                        let init = self.gen_expr(init_size, idents, false);
+                        let body = self.gen_expr(body_size, idents + 2, false);
                         Fold {
                             foldee: ~foldee,
                             init: ~init,
