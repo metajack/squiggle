@@ -11,11 +11,13 @@ use std::task;
 use extra::arc;
 use extra::time;
 
-static DEFAULT_PARALLELISM: uint = 0;
-static CHECK_EVERY: uint = 10_000;
+static DEFAULT_PARALLELISM: uint = 1;
+static CHECK_EVERY: uint = 16384;
+
+static DEFAULT_TIMEOUT: u64 = 60;
 
 pub enum GenMsg {
-    Generate(Chan<~Program>),
+    Generate(Chan<Option<~Program>>),
     Reset(Problem, ~[(u64, u64)]),
     MoreConstraints(~[(u64, u64)]),
     Exit,
@@ -49,7 +51,7 @@ impl RandomGen {
         (**self).send(Reset(problem, constraints));
     }
 
-    pub fn next(&mut self) -> ~Program {
+    pub fn next(&mut self) -> Option<~Program> {
         let (port, chan) = comm::stream();
         (**self).send(Generate(chan));
         port.recv()
@@ -81,9 +83,12 @@ impl RandomGen {
 
                     let start_ns = time::precise_time_ns();
 
-                    let parallelism: uint = FromStr::from_str(
-                        os::getenv("PAR").unwrap_or_default(~"1"))
-                        .unwrap_or_default(DEFAULT_PARALLELISM);
+                    let parallelism: uint = do os::getenv("PAR").chain |s| {
+                        FromStr::from_str(s)
+                    }.unwrap_or_default(DEFAULT_PARALLELISM);
+                    let timeout_ns: u64 = do os::getenv("TIMEOUT").chain |s| {
+                        FromStr::from_str(s)
+                    }.unwrap_or_default(DEFAULT_TIMEOUT) * 1_000_000_000;
 
                     for task_num in range(0, parallelism) {
                         let task_chan = inner_chan.clone();
@@ -115,6 +120,11 @@ impl RandomGen {
                                         let elapsed = time::precise_time_ns() - start_ns;
                                         printfln!("gen stats: task %u: searched for %uMiter (%uns/iter)",
                                                   task_num, i / 1_000_000, (elapsed / (i as u64)) as uint);
+                                        if elapsed > timeout_ns {
+                                            printfln!("task %u timed out", task_num);
+                                            task_chan.send(None);
+                                            break 'newprog;
+                                        }
                                     }
                                     loop 'newprog;
                                 }
@@ -124,7 +134,7 @@ impl RandomGen {
                                               task_num, i / 1000000, (elapsed / 1000000) as uint);
                                 }
 
-                                task_chan.send(~prog);
+                                task_chan.send(Some(~prog));
                                 break;
                             }
                         }

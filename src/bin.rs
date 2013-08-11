@@ -172,30 +172,36 @@ fn solve_problem<A: Api>(problem: Problem, api: &mut A, stats: &mut Statistics,
     stats.start();
     gen.reset(problem.clone(), pairs);
 
-    'next_candidate: loop {
-        let candidate = gen.next();
+    loop {
+        match gen.next() {
+            Some(candidate) => {
+                println(candidate.to_str());
+                info!(candidate);
+                match api.guess_blocking(problem.clone(), candidate.to_str()) {
+                    Win => {
+                        println("win!");
+                        break
+                    }
+                    Mismatch(input, real, ours) => {
+                        printfln!("P(%?) == %? != %?", input, real, ours);
 
-        println(candidate.to_str());
-        info!(candidate);
-        match api.guess_blocking(problem.clone(), candidate.to_str()) {
-            Win => {
-                println("win!");
-                break 'next_candidate;
+                        let mut pairs = fetch_n_random_testcases(problem.clone(), 50, api);
+                        pairs.push((input, real));
+
+                        gen.more_constraints(pairs);
+                    }
+                    Error(s) => {
+                        printfln!("Error occured: %s", s);
+                    }
+                }
             }
-            Mismatch(input, real, ours) => {
-                printfln!("P(%?) == %? != %?", input, real, ours);
-
-                let mut pairs = fetch_n_random_testcases(problem.clone(), 50, api);
-                pairs.push((input, real));
-
-                gen.more_constraints(pairs);
-                loop 'next_candidate;
-            }
-            Error(s) => {
-                printfln!("Error occured: %s", s);
+            None => {
+                println("Timed out :(");
+                break
             }
         }
     }
+
     stats.end();
     stats.report();
 }
