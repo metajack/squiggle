@@ -56,12 +56,21 @@ fn main() {
             }
         }
         ~"faketrain" => {
-            let progs = do args.slice_from(2).iter().transform |string| {
+            let bonus = if args.len() == 4 {
+                args[2] == ~"bonus"
+            } else {
+                false
+            };
+            let prog = {
                 use parse::Parse;
-                string.parse()
-            }.collect();
+                if args.len() == 4 {
+                    args[3].parse()
+                } else {
+                    args[2].parse()
+                }
+            };
 
-            faketrain(progs)
+            faketrain(prog, bonus)
         }
         ~"localtrain" => {
             if args.len() < 3 {
@@ -163,14 +172,15 @@ fn train(size: u8, operator: TrainOperator, local: bool) {
     }
 }
 
-fn faketrain(progs: ~[program::Program]) {
-    let mut api = FakeApi::new(progs);
+fn faketrain(progs: program::Program, bonus: bool) {
+    let mut api = FakeApi::new(~[progs]);
     let mut stats = Statistics::new();
     let mut gen = RandomGen::blank();
 
     while api.has_programs() {
         // the args are ignored anyway
-        let prob = api.get_training_blocking(0, Empty);
+        let mut prob = api.get_training_blocking(0, Empty);
+        prob.problem.operators.bonus = bonus;
 
         printfln!("FAKETRAIN: -- %u -- %s -- %s",
                   prob.problem.size as uint,
