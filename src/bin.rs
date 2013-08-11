@@ -108,6 +108,8 @@ fn main() {
                     ~"bonus" => Bonus,
                     ~"nobonus" => NoBonus,
                     ~"noif0" => NoIf0,
+                    ~"foldnoif0" => FoldNoIf0,
+                    ~"tfoldnoif0" => TfoldNoIf0,
                     _ => {
                         println("error: bad filter value, using no filter");
                         All
@@ -210,6 +212,8 @@ fn problems(count: uint, filter: ProblemFilter, min_size: u8) {
             Bonus => p.problem.operators.bonus,
             NoBonus => !p.problem.operators.bonus,
             NoIf0 => !p.problem.operators.if0,
+            FoldNoIf0 => !p.problem.operators.if0 && p.problem.fold,
+            TfoldNoIf0 => !p.problem.operators.if0 && p.problem.tfold,
         })
         .filter(|p| p.problem.size >= min_size)
         .collect();
@@ -346,6 +350,8 @@ enum ProblemFilter {
     Bonus,
     NoBonus,
     NoIf0,
+    FoldNoIf0,
+    TfoldNoIf0,
 }
 
 struct Statistics {
