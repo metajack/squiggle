@@ -7,6 +7,7 @@ use std::comm::{Port, Chan};
 use std::rand::{Rng, RngUtil, XorShiftRng, task_rng};
 use std::task;
 use extra::arc;
+use extra::time;
 
 static PARALLELISM: uint = 1;
 static CHECK_EVERY: uint = 1024;
@@ -76,6 +77,8 @@ impl RandomGen {
                     let stop_arc = arc::RWArc::new(false);
                     let problem_size = problem.size as uint;
 
+                    let start_ns = time::precise_time_ns();
+
                     for task_num in range(0, PARALLELISM) {
                         let task_chan = inner_chan.clone();
                         let task_stop_arc = stop_arc.clone();
@@ -102,14 +105,16 @@ impl RandomGen {
 
                                 if task_constraints.iter().any(|&(x,y)| prog.eval(x) != y) {
                                     if i % 1000000 == 0 {
-                                        printfln!("gen stats: task %u: searched for %u iters",
-                                                  task_num, i);
+                                        let elapsed = time::precise_time_ns() - start_ns;
+                                        printfln!("gen stats: task %u: searched for %uiter (%uns/iter)",
+                                                  task_num, i, (elapsed / (i as u64)) as uint);
                                     }
                                     loop 'newprog;
                                 }
                                 if i > 1 {
-                                    printfln!("gen stats: task %u: candidate took %u iters",
-                                              task_num, i);
+                                    let elapsed = time::precise_time_ns() - start_ns;
+                                    printfln!("gen stats: task %u: candidate took %uMiter %ums",
+                                              task_num, i / 1000000, (elapsed / 1000000) as uint);
                                 }
 
                                 task_chan.send(~prog);
