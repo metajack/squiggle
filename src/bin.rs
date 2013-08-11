@@ -10,7 +10,10 @@ use gen::*;
 use webapi::*;
 
 use std::hashmap::HashMap;
+use std::io;
+use std::io::WriterUtil;
 use std::os;
+use std::path::Path;
 use std::rand::{Rng, RngUtil};
 use std::vec;
 use extra::sort;
@@ -135,11 +138,15 @@ fn train(size: u8, operator: TrainOperator, local: bool) {
 
     loop {
         let prob = api.get_training_blocking(size, operator);
-        printfln!("TRAIN: -- %u -- %s -- %s",
-                  prob.problem.size as uint,
-                  prob.problem.operators.to_str(),
-                  prob.problem.id);
-        printfln!("GOLD: %s", prob.challenge);
+        let mut s = ~"";
+        s.push_str(fmt!("TRAIN: -- %u -- %s -- %s\n",
+                        prob.problem.size as uint,
+                        prob.problem.operators.to_str(),
+                        prob.problem.id));
+        s.push_str(fmt!("GOLD: %s\n\n", prob.challenge));
+        println(s);
+        let writer = io::file_writer(&Path("train.log"), [io::Append]).unwrap();
+        writer.write_str(s);
 
         if local {
             println("solving locally");
