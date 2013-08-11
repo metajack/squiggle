@@ -65,7 +65,7 @@ fn main() {
             } else {
                 1_000_000_000 // run forever
             };
-            let filter = if args.len() == 4 {
+            let filter = if args.len() >= 4 {
                 match args[3] {
                     ~"fold" => Folded,
                     ~"tfold" => Tfolded,
@@ -80,7 +80,12 @@ fn main() {
             } else {
                 All
             };
-            problems(count, filter)
+            let min_size = if args.len() >= 5 {
+                FromStr::from_str(args[4]).expect("bad min size")
+            } else {
+                0
+            };
+            problems(count, filter, min_size)
         }
         ~"showprobs" => show_problems(),
         ~"eval" => {
@@ -134,7 +139,7 @@ fn faketrain(progs: ~[program::Program]) {
     }
 }
 
-fn problems(count: uint, filter: ProblemFilter) {
+fn problems(count: uint, filter: ProblemFilter, min_size: u8) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
     let mut gen = RandomGen::blank();
@@ -152,6 +157,7 @@ fn problems(count: uint, filter: ProblemFilter) {
             Folded => p.problem.operators.fold,
             Bonus => p.problem.operators.bonus,
         })
+        .filter(|p| p.problem.size >= min_size)
         .collect();
     sort::tim_sort(unsolved_probs);
 
