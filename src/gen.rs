@@ -104,7 +104,7 @@ impl RandomGen {
                                 i += 1;
                                 if i % CHECK_EVERY == 0 {
                                     if task_stop_arc.read(|&stop| stop) {
-                                        printfln!("task %u: someone else found it", task_num);
+                                        //printfln!("task %u: someone else found it", task_num);
                                         break
                                     }
 
