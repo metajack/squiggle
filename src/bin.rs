@@ -48,7 +48,8 @@ fn main() {
                     Empty
                 };
                 train(FromStr::from_str(args[2]).expect("bad size"),
-                      folding);
+                      folding,
+                      false);
             }
         }
         ~"faketrain" => {
@@ -58,6 +59,27 @@ fn main() {
             }.collect();
 
             faketrain(progs)
+        }
+        ~"localtrain" => {
+            if args.len() < 3 {
+                println("error: missing training size");
+            } else {
+                let folding = if args.len() == 4 {
+                    match args[3] {
+                        ~"fold" => Fold,
+                        ~"tfold" => Tfold,
+                        _ => {
+                            println("error: bad folding value, using no folds");
+                            Empty
+                        }
+                    }
+                } else {
+                    Empty
+                };
+                train(FromStr::from_str(args[2]).expect("bad size"),
+                      folding,
+                      true);
+            }
         }
         ~"problems" => {
             let count = if args.len() >= 3 {
@@ -105,8 +127,9 @@ fn status() {
     printfln!("%?", status);
 }
 
-fn train(size: u8, operator: TrainOperator) {
+fn train(size: u8, operator: TrainOperator, local: bool) {
     let mut api = WebApi::new();
+    let mut local_api = FakeApi::new(~[]);
     let mut stats = Statistics::new();
     let mut gen = RandomGen::blank();
 
@@ -118,7 +141,17 @@ fn train(size: u8, operator: TrainOperator) {
                   prob.problem.id);
         printfln!("GOLD: %s", prob.challenge);
 
-        solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
+        if local {
+            println("solving locally");
+            local_api.add_prog(prob.problem.id, {
+                use parse::Parse;
+                prob.challenge.parse()
+            });
+            solve_problem(prob.problem, &mut local_api, &mut stats, &mut gen);
+        } else {
+            println("solving remotely");
+            solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
+        }
     }
 }
 

@@ -174,6 +174,12 @@ impl FakeApi {
     pub fn has_programs(&self) -> bool {
         !self.programs.is_empty()
     }
+
+    pub fn add_prog(&mut self, id: &str, program: Program) {
+        self.programs.push(program.clone());
+        //self.by_str = self.programs.iter().transform(|p| (p.to_str(), p.clone())).collect();
+        self.by_str.insert(id.to_owned(), program);
+    }
 }
 
 impl Api for FakeApi {
