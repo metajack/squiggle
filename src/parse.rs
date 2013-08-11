@@ -151,7 +151,7 @@ impl<'self> Parser<'self> {
     pub fn consume_ident_str(&mut self) -> ~str {
         let mut offset = 0;
         for (new_offset, c) in self.src.char_offset_iter() {
-            if c.is_alphanumeric() {
+            if c.is_alphanumeric() || c == '_' {
                 offset = new_offset + c.len_utf8_bytes();
             } else {
                 break
@@ -200,6 +200,7 @@ mod tests {
                                                   ~Op1(Shl1,
                                                        ~If0(~Ident(0),~Zero,~One)))));
     }
+
     #[test]
     fn test_parse_fold() {
        let mut p = Parser::new("(lambda (x) (fold x 0 (lambda (a b) (plus a b))))");
@@ -210,5 +211,11 @@ mod tests {
                         accum_id: 2,
                         body: ~Op2(Plus, ~Ident(1), ~Ident(2))
                     }));
+    }
+
+    #[test]
+    fn test_parse_weird_id() {
+        let mut p = Parser::new("(lambda (x_29045) x_29045)");
+        assert_eq!(p.parse(), Program::new(0, ~Ident(0)));
     }
 }
