@@ -605,7 +605,7 @@ fn get_request(url: ~str) -> Json {
 }
 
 fn post_request(url: ~str, data: ~str) -> Json {
-    let mut tries = 5;
+    let mut tries = 15;
     while tries > 0 {
         info!("POST /%s", extract_path(url));
         info!("DATA: %s", data);
