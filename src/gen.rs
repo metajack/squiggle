@@ -247,6 +247,9 @@ impl RandomGenState {
         // program, if, and, one
         let remaining = size - 1 - 1 - 1 - 1;
 
+        // seems that only one if0 occurs, so disable it from here.
+        self.operators.if0 = false;
+
         // need to leave space for the 2 binops, i.e. a minimum of 3 each,
         let cond_s = self.gen_size(remaining - 6, false);
         let cond = ~self.gen_expr(cond_s, 1, false);
