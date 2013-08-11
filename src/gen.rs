@@ -4,13 +4,15 @@ use program::*;
 use std::cell::Cell;
 use std::comm;
 use std::comm::{Port, Chan};
+use std::from_str::FromStr;
+use std::os;
 use std::rand::{Rng, RngUtil, XorShiftRng, task_rng};
 use std::task;
 use extra::arc;
 use extra::time;
 
-static PARALLELISM: uint = 1;
-static CHECK_EVERY: uint = 1024;
+static DEFAULT_PARALLELISM: uint = 0;
+static CHECK_EVERY: uint = 10_000;
 
 pub enum GenMsg {
     Generate(Chan<~Program>),
@@ -79,7 +81,11 @@ impl RandomGen {
 
                     let start_ns = time::precise_time_ns();
 
-                    for task_num in range(0, PARALLELISM) {
+                    let parallelism: uint = FromStr::from_str(
+                        os::getenv("PAR").unwrap_or_default(~"1"))
+                        .unwrap_or_default(DEFAULT_PARALLELISM);
+
+                    for task_num in range(0, parallelism) {
                         let task_chan = inner_chan.clone();
                         let task_stop_arc = stop_arc.clone();
                         let task_gen = Cell::new(gen.clone());
