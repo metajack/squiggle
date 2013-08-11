@@ -269,6 +269,7 @@ impl RandomGenState {
         let left_arm_s = self.rng.gen_uint_range(3, arms_s - 2);
         let right_arm_s = arms_s - left_arm_s;
         assert!(left_arm_s + right_arm_s == arms_s);
+        //printfln!("left_arm = %u, right_arm = %u", left_arm_s, right_arm_s);
 
         // build left arm
 
@@ -276,27 +277,28 @@ impl RandomGenState {
             // do an arg1 is Op2
 
             // leave room for op and for arg2
-            let left_arg1_s = self.gen_size(left_arm_s - 1, false);
+            let left_arg1_s = self.gen_size(left_arm_s - 2, false);
             let left_arg2_s = left_arm_s - 1 - left_arg1_s;
             assert!(left_arm_s == 1 + left_arg1_s + left_arg2_s);
+            //printfln!("arg1 = %u, arg2 = %u", left_arg1_s, left_arg2_s);
         
+            //println("left arm arg1 is binop");
             let left_op = self.rng.choose(self.op2_choices);
+            //println("genning left arm arg1");
             let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
+            //println("genning left arm arg2");
             let left_arg2 = self.gen_expr(left_arg2_s, 1, false);
 
             Op2(left_op, ~left_arg1, ~left_arg2)
         } else {
-            // pick sizes for left and right. left in
-            let left_arm_s = self.rng.gen_uint_range(2, arms_s - 1);
-            let right_arm_s = arms_s - left_arm_s;
-            assert!(left_arm_s + right_arm_s == arms_s);
-
-            // build left arm
-
+            // left arg2 is unaop
             // leave room for op and for arg2
             let left_arg1_s = left_arm_s - 1;
+            //printfln!("left arg1 = %u", left_arg1_s);
 
+            //println("left arm arg1 is unaop");
             let left_op = self.rng.choose(self.op1_choices);
+            //println("genning left arm arg1");
             let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
 
             Op1(left_op, ~left_arg1)
@@ -361,6 +363,7 @@ impl RandomGenState {
 
     fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {
         //printfln!("gen_expr(%u)", size);
+        assert!(size > 0);
         match size {
             1 => {
                 // Choices:
@@ -533,6 +536,7 @@ impl RandomGenState {
                         let size = size - 1; // account for op
                         let mut left_size;
                         let mut right_size;
+                        //printfln!("trying to gen %u slots for binop", size);
                         loop {
                             left_size = self.gen_size(size - 1, foldable);
                             right_size = size - left_size;
