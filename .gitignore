@@ -4,3 +4,4 @@ squiggle
 squiggle-test.dSYM
 squiggle-test
 dist
+*.tar.gz
