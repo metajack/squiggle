@@ -71,7 +71,7 @@ fn main() {
                     ~"tfold" => Tfolded,
                     ~"all" => All,
                     ~"unfold" => Unfolded,
-                    ~"bonus" => Bonus
+                    ~"bonus" => Bonus,
                     _ => {
                         println("error: bad filter value, using no filter");
                         All
