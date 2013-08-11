@@ -9,6 +9,7 @@ use eval::Eval;
 use gen::*;
 use webapi::*;
 
+use std::hashmap::HashMap;
 use std::os;
 use std::rand::{Rng, RngUtil};
 use std::vec;
@@ -193,7 +194,7 @@ fn show_problems() {
     let mut probs: ~[RealProblem] = api.get_problems_blocking().consume_iter().collect();
     sort::tim_sort(probs);
 
-    let mut stats = vec::from_elem(28, 0u);
+    let mut stats = HashMap::new::<uint,uint>();
     let mut failed = 0u;
     let mut solved = 0u;
     let mut total = 0u;
@@ -212,7 +213,7 @@ fn show_problems() {
             (false, Some(_)) => "IN PROGRESS",
         };
         total += 1;
-        stats[prob.problem.size - 3] += 1;
+        do stats.insert_or_update_with(prob.problem.size as uint, 1) |_, v| { *v += 1; };
 
         printfln!("%s -- %u -- %s -- %s",
                   status,
@@ -222,8 +223,8 @@ fn show_problems() {
     }
 
     println("SIZES:");
-    for i in range(3, 31) {
-        printfln!("\tsize %i: %u", i, stats[i - 3]);
+    for (k, v) in stats.iter() {
+        printfln!("\tsize %u: %u", *k, *v);
     }
 
 
