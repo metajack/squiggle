@@ -256,8 +256,20 @@ impl RandomGenState {
 
         // need to leave space for the 2 binops, i.e. a minimum of 3 each.
         // also, we must use and and atomic
-        let partial_cond_s = self.gen_size(remaining - 6 - 2, false);
-        let partial_cond = self.gen_expr(partial_cond_s, 1, false);
+        let mut partial_cond_s = self.gen_size(remaining - 6 - 2, false);
+
+        // make partial_cond a binop
+        if partial_cond_s < 3 { partial_cond_s = 3; }
+        let partial_cond_op = self.rng.choose(self.op2_choices);
+        let pc_left_s = self.gen_size(partial_cond_s - 2, false);
+        let pc_right_s = partial_cond_s - 1 - pc_left_s;
+        //printfln!("pc size = %u, pc left = %u, pc right = %u", partial_cond_s, pc_left_s, pc_right_s);
+        assert!(partial_cond_s == 1 + pc_left_s + pc_right_s);
+
+        let pc_left = self.gen_expr(pc_left_s, 1, false);
+        let pc_right = self.gen_expr(pc_right_s, 1, false);
+
+        let partial_cond = Op2(partial_cond_op, ~pc_left, ~pc_right);
         let cond = Op2(And, ~partial_cond, ~atomic);
 
         let cond_s = partial_cond_s + 2;
