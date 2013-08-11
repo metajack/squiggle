@@ -207,27 +207,38 @@ impl RandomGenState {
         self.op2_choices = op2_choices;
     }
 
-    fn gen_program(&mut self, mut size: uint) -> Program {
+    fn gen_program(&mut self, size: uint) -> Program {
         //println("gen_program");
-        // remove the size of each program (1)
-        size -= 1;
-
         if self.operators.tfold {
-            // remove the sizes of fold, x and 0
-            let body = ~self.gen_expr(size - 2 - 1 - 1, 2, false);
-
-            // use 2 here, because it won't be referred to in the body
-            // ever. i.e. it's shadowed.
-            Program::new(2, ~Fold {
-                    foldee: ~Ident(2),
-                    init: ~Zero,
-                    next_id: 0,
-                    accum_id: 1,
-                    body: body
-                })
+            self.gen_tfold(size)
+        } else if self.operators.bonus {
+            self.gen_bonus(size)
         } else {
-            Program::new(0, ~self.gen_expr(size, 1, self.operators.fold))
+            Program::new(0, ~self.gen_expr(size - 1, 1, self.operators.fold))
         }
+    }
+
+    fn gen_tfold(&mut self, size: uint) -> Program {
+        // remove the sizes of the program, fold, x and 0
+        let body = ~self.gen_expr(size - 1 - 2 - 1 - 1, 2, false);
+
+        // use 2 here, because it won't be referred to in the body
+        // ever. i.e. it's shadowed.
+        Program::new(2, ~Fold {
+                foldee: ~Ident(2),
+                init: ~Zero,
+                next_id: 0,
+                accum_id: 1,
+                body: body
+            })
+    }
+
+    fn gen_bonus(&mut self, size: uint) -> Program {
+        //let
+
+        //let expr = ~If0(~And(,~One), )
+
+        fail!()
     }
 
     fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {
@@ -365,7 +376,7 @@ impl RandomGenState {
 
                 // we can't generate size=6,7 folds without unaops as it will
                 // force a size=2. we also can only gen size=8,10 if we have if0
-                let gen_fold = foldable && (have_unaops || 
+                let gen_fold = foldable && (have_unaops ||
                                             (have_if0 && (size == 8 || size == 10)) ||
                                             (size != 5 && size != 6 && size != 8 && size != 10));
 
@@ -530,7 +541,7 @@ impl RandomGenState {
                 return choice;
             }
         }
-            
+
         // We have fold/if0, so prevent 6 and 2. 6 causes a slot of 2, and 2
         // is not allowed because of missing unaops
         if choice == 6 || choice == 2 {

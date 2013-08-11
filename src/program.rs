@@ -106,6 +106,7 @@ impl OperatorSet {
 impl ToStr for OperatorSet {
     pub fn to_str(&self) -> ~str {
         let mut ops = ~[];
+        if self.bonus { ops.push(~"bonus") }
         if self.tfold { ops.push(~"tfold"); }
         if self.fold { ops.push(~"fold"); }
         if self.if0 { ops.push(~"if0"); }
@@ -134,6 +135,7 @@ impl Clone for OperatorSet {
         ops.if0 = self.if0;
         ops.fold = self.fold;
         ops.tfold = self.tfold;
+        ops.bonus = self.bonus;
         ops
     }
 }
@@ -149,6 +151,7 @@ impl Eq for OperatorSet {
         if other.if0 != self.if0 { return false; }
         if other.fold != self.fold { return false; }
         if other.tfold != self.tfold { return false; }
+        if other.bonus != self.bonus { return false; }
         true
     }
 }
