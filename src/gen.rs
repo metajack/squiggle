@@ -265,39 +265,69 @@ impl RandomGenState {
         let arms_s = remaining - cond_s; // the binops themselves
         //printfln!("cond_s = %u, arms_s = %u", cond_s, arms_s);
 
-        // pick sizes for left and right. left in
+        // pick sizes for left and right.
         let left_arm_s = self.rng.gen_uint_range(3, arms_s - 2);
         let right_arm_s = arms_s - left_arm_s;
         assert!(left_arm_s + right_arm_s == arms_s);
 
         // build left arm
 
-        // leave room for op and for arg2
-        let left_arg1_s = self.gen_size(left_arm_s - 2, false);
-        let left_arg2_s = left_arm_s - 1 - left_arg1_s;
-        assert!(left_arm_s == 1 + left_arg1_s + left_arg2_s);
+        let left_arm = if left_arm_s >= 3 && self.rng.gen() { 
+            // do an arg1 is Op2
 
-        let left_op = self.rng.choose(self.op2_choices);
-        let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
-        let left_arg2 = self.gen_expr(left_arg2_s, 1, false);
+            // leave room for op and for arg2
+            let left_arg1_s = self.gen_size(left_arm_s - 1, false);
+            let left_arg2_s = left_arm_s - 1 - left_arg1_s;
+            assert!(left_arm_s == 1 + left_arg1_s + left_arg2_s);
+        
+            let left_op = self.rng.choose(self.op2_choices);
+            let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
+            let left_arg2 = self.gen_expr(left_arg2_s, 1, false);
 
-        let left_arm = Op2(left_op, ~left_arg1, ~left_arg2);
+            Op2(left_op, ~left_arg1, ~left_arg2)
+        } else {
+            // pick sizes for left and right. left in
+            let left_arm_s = self.rng.gen_uint_range(2, arms_s - 1);
+            let right_arm_s = arms_s - left_arm_s;
+            assert!(left_arm_s + right_arm_s == arms_s);
 
+            // build left arm
+
+            // leave room for op and for arg2
+            let left_arg1_s = left_arm_s - 1;
+
+            let left_op = self.rng.choose(self.op1_choices);
+            let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
+
+            Op1(left_op, ~left_arg1)
+        };
+        
         // build right arm
 
-        // leave room for op and for arg2
-        let right_arg1_s = self.gen_size(right_arm_s - 2, false);
-        let right_arg2_s = right_arm_s - 1 - right_arg1_s;
-        assert!(right_arm_s == 1 + right_arg1_s + right_arg2_s);
+        let right_arm = if right_arm_s >= 3 && self.rng.gen() {
+            // right arg is Op2
 
-        let right_op = self.rng.choose(self.op2_choices);
-        let right_arg1 = self.gen_expr(right_arg1_s, 1, false);
-        let right_arg2 = self.gen_expr(right_arg2_s, 1, false);
+            // leave room for op and for arg2
+            let right_arg1_s = self.gen_size(right_arm_s - 2, false);
+            let right_arg2_s = right_arm_s - 1 - right_arg1_s;
+            assert!(right_arm_s == 1 + right_arg1_s + right_arg2_s);
 
-        let right_arm = Op2(right_op, ~right_arg1, ~right_arg2);
+            let right_op = self.rng.choose(self.op2_choices);
+            let right_arg1 = self.gen_expr(right_arg1_s, 1, false);
+            let right_arg2 = self.gen_expr(right_arg2_s, 1, false);
+
+            Op2(right_op, ~right_arg1, ~right_arg2)
+        } else {
+            // leave room for op and for arg2
+            let right_arg1_s = right_arm_s - 1;
+
+            let right_op = self.rng.choose(self.op1_choices);
+            let right_arg1 = self.gen_expr(right_arg1_s, 1, false);
+
+            Op1(right_op, ~right_arg1)
+        };
 
         let expr = If0(~cond, ~left_arm, ~right_arm);
-
         let prog = Program::new(0, ~expr);
 
         prog
