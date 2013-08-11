@@ -244,40 +244,87 @@ impl RandomGenState {
     }
 
     fn gen_bonus(&mut self, size: uint) -> Program {
-        // program, if, and, one
-        let remaining = size - 1 - 1 - 1 - 1;
+        //println("gen_bonus");
+        // program, if
+        let remaining = size - 1 - 1;
 
         // seems that only one if0 occurs, so disable it from here.
         self.operators.if0 = false;
 
-        // need to leave space for the 2 binops, i.e. a minimum of 3 each,
-        let cond_s = self.gen_size(remaining - 6, false);
-        let cond = ~self.gen_expr(cond_s, 1, false);
+        // the second arg to the conditional (and ..)
+        let atomic = self.gen_expr(1, 1, false);
 
-        let mut arms_s = remaining - cond_s - 2; // the binops themselves
+        // need to leave space for the 2 binops, i.e. a minimum of 3 each.
+        // also, we must use and and atomic
+        let partial_cond_s = self.gen_size(remaining - 6 - 2, false);
+        let partial_cond = self.gen_expr(partial_cond_s, 1, false);
+        let cond = Op2(And, ~partial_cond, ~atomic);
 
-        let then_lhs_s = self.gen_size(arms_s - 3, false);
-        arms_s -= then_lhs_s;
-        let else_lhs_s = self.gen_size(arms_s - 2, false);
-        arms_s -= else_lhs_s;
+        let cond_s = partial_cond_s + 2;
 
-        let then_rhs_s = self.gen_size(arms_s - 1, false);
-        let else_rhs_s = arms_s - then_rhs_s;
+        let arms_s = remaining - cond_s; // the binops themselves
+        //printfln!("cond_s = %u, arms_s = %u", cond_s, arms_s);
 
-        let then_lhs = ~self.gen_expr(then_lhs_s, 1, false);
-        let then_rhs = ~self.gen_expr(then_rhs_s, 1, false);
-        let else_lhs = ~self.gen_expr(else_lhs_s, 1, false);
-        let else_rhs = ~self.gen_expr(else_rhs_s, 1, false);
+        // pick sizes for left and right. left in
+        let left_arm_s = self.rng.gen_uint_range(3, arms_s - 2);
+        let right_arm_s = arms_s - left_arm_s;
+        assert!(left_arm_s + right_arm_s == arms_s);
 
-        let then_op = self.rng.choose(self.op2_choices);
-        let else_op = self.rng.choose(self.op2_choices);
+        // build left arm
 
+        // leave room for op and for arg2
+        let left_arg1_s = self.gen_size(left_arm_s - 2, false);
+        let left_arg2_s = left_arm_s - 1 - left_arg1_s;
+        assert!(left_arm_s == 1 + left_arg1_s + left_arg2_s);
 
-        let expr = ~If0(~Op2(And, cond,~One),
-                        ~Op2(then_op, then_lhs, then_rhs),
-                        ~Op2(else_op, else_lhs, else_rhs));
+        let left_op = self.rng.choose(self.op2_choices);
+        let left_arg1 = self.gen_expr(left_arg1_s, 1, false);
+        let left_arg2 = self.gen_expr(left_arg2_s, 1, false);
 
-        let prog = Program::new(0, expr);
+        let left_arm = Op2(left_op, ~left_arg1, ~left_arg2);
+
+        // build right arm
+
+        // leave room for op and for arg2
+        let right_arg1_s = self.gen_size(right_arm_s - 2, false);
+        let right_arg2_s = right_arm_s - 1 - right_arg1_s;
+        assert!(right_arm_s == 1 + right_arg1_s + right_arg2_s);
+
+        let right_op = self.rng.choose(self.op2_choices);
+        let right_arg1 = self.gen_expr(right_arg1_s, 1, false);
+        let right_arg2 = self.gen_expr(right_arg2_s, 1, false);
+
+        let right_arm = Op2(right_op, ~right_arg1, ~right_arg2);
+
+        let expr = If0(~cond, ~left_arm, ~right_arm);
+
+        let prog = Program::new(0, ~expr);
+
+        prog
+    }
+
+    fn gen_bonus2(&mut self, size: uint) -> Program {
+        assert!(false);
+
+        //printfln!("gen_bonus2(%u)", size);
+        // program, if
+        let remaining = size - 1 - 1;
+
+        // need to leave space for the 2 args
+        let cond_s = self.gen_size(remaining - 2, false);
+        let rest = remaining - cond_s;
+        let then_s = self.gen_size(rest - 1, false);
+        let else_s = rest - then_s;
+
+        let cond = self.gen_expr(cond_s, 1, false);
+        let then = self.gen_expr(then_s, 1, false);
+        let other = self.gen_expr(else_s, 1, false);
+
+        let expr = If0(~cond,
+                       ~then,
+                       ~other);
+
+        let prog = Program::new(0, ~expr);
 
         prog
     }
