@@ -43,6 +43,14 @@ pub trait Api {
         res
     }
 
+    fn eval_program(&mut self, program: Program, inputs: ~[u64]) -> Port<Option<~[u64]>>;
+    fn eval_program_blocking(&mut self, program: Program, inputs: ~[u64]) -> Option<~[u64]> {
+        print("evaluating inputs...");
+        let res = self.eval_program(program, inputs).recv();
+        println("done.");
+        res
+    }
+
     fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult>;
     fn guess_blocking(&mut self, problem: Problem, program: ~str) -> GuessResult {
         self.guess(problem, program).recv()
@@ -129,6 +137,12 @@ impl Api for WebApi {
         port
     }
 
+    pub fn eval_program(&mut self, program: Program, inputs: ~[u64]) -> Port<Option<~[u64]>> {
+        let (port, chan) = comm::stream();
+        (**self).send(EvalProgram(program, inputs, chan));
+        port
+    }
+
     pub fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult> {
         let (port, chan) = comm::stream();
         (**self).send(Guess(problem, program, chan));
@@ -207,6 +221,16 @@ impl Api for FakeApi {
 
         let outs = do inputs.consume_iter().transform |x| {
             prog.eval(x)
+        }.collect();
+
+        let (port, chan) = comm::stream();
+        chan.send(Some(outs));
+        port
+    }
+
+    pub fn eval_program(&mut self, program: Program, inputs: ~[u64]) -> Port<Option<~[u64]>> {
+        let outs = do inputs.consume_iter().transform |x| {
+            program.eval(x)
         }.collect();
 
         let (port, chan) = comm::stream();
@@ -327,6 +351,30 @@ fn dispatch(req: Request) {
             resp_chan.send(probs);
         }
         Eval(prob, inputs, resp_chan) => resp_chan.send(prob.eval(inputs)),
+        EvalProgram(prog, inputs, resp_chan) => {
+            let mut obj: TreeMap<~str, Json> = TreeMap::new();
+            obj.insert(~"program", prog.to_str().to_json());
+
+            let args = inputs.iter().transform(|i| i.to_str_radix(16)).to_owned_vec();
+            obj.insert(~"arguments", args.to_json());
+            let eval_json = obj.to_json().to_str();
+
+            let response = match post_request(make_url("eval"), eval_json) {
+                Object(o) => o,
+                _ => fail!("bad eval response")
+            };
+
+            let outs = if "ok" == get_json_str(response, ~"status") {
+                let outs = get_json_array(response, ~"outputs");
+                Some(do outs.iter().transform |j| {
+                    read_0x_hex(unwrap_json_str(j))
+                }.to_owned_vec())
+            } else {
+                println(get_json_str(response, ~"message"));
+                None
+            };
+            resp_chan.send(outs);
+        }
         Guess(prob, prog, resp_chan) => resp_chan.send(prob.guess(prog)),
     }
 }
@@ -336,6 +384,7 @@ enum Request {
     Train(u8, TrainOperator, Chan<TrainProblem>),
     Problems(Chan<~[RealProblem]>),
     Eval(Problem, ~[u64], Chan<Option<~[u64]>>),
+    EvalProgram(Program, ~[u64], Chan<Option<~[u64]>>),
     Guess(Problem, ~str, Chan<GuessResult>),
 }
 
@@ -514,6 +563,7 @@ trait WebEval {
             }
         }
     }
+
     fn eval(&self, nums: &[u64]) -> Option<~[u64]> {
         let mut obj: TreeMap<~str, Json> = TreeMap::new();
         obj.insert(~"id", self.get_id().to_json());

@@ -83,6 +83,13 @@ fn main() {
             problems(count, filter)
         }
         ~"showprobs" => show_problems(),
+        ~"eval" => {
+            let prog = {
+                use parse::Parse;
+                args[2].parse()
+            };
+            eval(prog);
+        }
         _ => println("error: unknown command"),
     }
 }
@@ -235,6 +242,34 @@ fn show_problems() {
     printfln!("STATS: %u (%u%%) solved -- %u (%u%%) failed",
               solved, ((solved as float) / (total as float) * 100f) as uint,
               failed, ((failed as float) / (total as float) * 100f) as uint);
+}
+
+fn eval(program: program::Program) {
+    let mut api = WebApi::new();
+
+    printfln!("EVAL: -- %s", program.to_str());
+
+
+    let mut rng = std::rand::task_rng();
+    let inputs: ~[u64] = std::vec::from_fn(50, |_| rng.gen());
+    let local_outputs: ~[u64] = inputs.iter().transform(|&x| program.eval(x)).collect();
+    let remote_outputs = api.eval_program_blocking(program, inputs.clone()).unwrap();
+
+    let mut all_match = true;
+    for i in range(0, local_outputs.len()) {
+        if local_outputs[i] != remote_outputs[i] {
+            all_match = false;
+            printfln!("mismatch: P(%u) = %u != %u",
+                      inputs[i] as uint,
+                      local_outputs[i] as uint,
+                      remote_outputs[i] as uint);
+        }
+    }
+    if all_match {
+        println("OK");
+    } else {
+        println("NOT OK");
+    }
 }
 
 enum ProblemFilter {

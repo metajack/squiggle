@@ -89,6 +89,7 @@ impl Scope {
 pub trait Eval {
     fn eval(&self, val: u64) -> u64;
 }
+
 impl Eval for Program {
     fn eval(&self, val: u64) -> u64 {
         (@Scope {
