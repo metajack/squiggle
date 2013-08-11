@@ -59,12 +59,26 @@ fn main() {
             faketrain(progs)
         }
         ~"problems" => {
-            let count = if args.len() == 3 {
+            let count = if args.len() >= 3 {
                 FromStr::from_str(args[2]).expect("bad count")
             } else {
                 1_000_000_000 // run forever
             };
-            problems(count)
+            let filter = if args.len() == 4 {
+                match args[3] {
+                    ~"fold" => Folded,
+                    ~"tfold" => Tfolded,
+                    ~"all" => All,
+                    ~"unfold" => Unfolded,
+                    _ => {
+                        println("error: bad filter value, using no filter");
+                        All
+                    }
+                }
+            } else {
+                All
+            };
+            problems(count, filter)
         }
         ~"showprobs" => show_problems(),
         _ => println("error: unknown command"),
@@ -111,19 +125,29 @@ fn faketrain(progs: ~[program::Program]) {
     }
 }
 
-fn problems(count: uint) {
+fn problems(count: uint, filter: ProblemFilter) {
     let mut api = WebApi::new();
     let mut stats = Statistics::new();
     let mut gen = RandomGen::blank();
 
     let probs = api.get_problems_blocking();
+    // TODO filter problems by train operator.
     let mut unsolved_probs: ~[RealProblem] = probs.consume_iter()
         .filter(|p| !p.solved && p.time_left.map_default(true, |&n| n > 0.0))
+        .filter(|p| match filter {
+            All => true,
+            Tfolded => p.problem.operators.tfold,
+            Unfolded => !p.problem.operators.fold && !p.problem.operators.tfold,
+            Folded => p.problem.operators.fold,
+        })
         .collect();
     sort::tim_sort(unsolved_probs);
 
     for prob in unsolved_probs.consume_iter().take_(count) {
-        printfln!("attempting problem %s (%u)", prob.problem.id, prob.problem.size as uint);
+        printfln!("PROBLEM: -- %u -- %s -- %s",
+                  prob.problem.size as uint,
+                  prob.problem.operators.to_str(),
+                  prob.problem.id);
 
         solve_problem(prob.problem, &mut api, &mut stats, &mut gen);
     }
@@ -206,6 +230,13 @@ fn show_problems() {
     printfln!("STATS: %u (%u%%) solved -- %u (%u%%) failed",
               solved, ((solved as float) / (total as float) * 100f) as uint,
               failed, ((failed as float) / (total as float) * 100f) as uint);
+}
+
+enum ProblemFilter {
+    All,
+    Tfolded,
+    Unfolded,
+    Folded,
 }
 
 struct Statistics {

@@ -1,3 +1,9 @@
+# benchmark the parallelism
+
+see if it's faster and how much so
+
+# prevent gen of stupid expressions like (or 0 1) and things.
+
 # buffer guesses
 
 guesses should continue to be generated in case more are needed. at least up
