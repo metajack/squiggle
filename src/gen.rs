@@ -108,12 +108,13 @@ impl RandomGen {
                                 }
 
                                 let prog = task_gen.gen_program(problem_size);
+                                //println(prog.to_str());
 
                                 if task_constraints.iter().any(|&(x,y)| prog.eval(x) != y) {
                                     if i % 1000000 == 0 {
                                         let elapsed = time::precise_time_ns() - start_ns;
-                                        printfln!("gen stats: task %u: searched for %uiter (%uns/iter)",
-                                                  task_num, i, (elapsed / (i as u64)) as uint);
+                                        printfln!("gen stats: task %u: searched for %uMiter (%uns/iter)",
+                                                  task_num, i / 1_000_000, (elapsed / (i as u64)) as uint);
                                     }
                                     loop 'newprog;
                                 }
@@ -220,8 +221,8 @@ impl RandomGenState {
             Program::new(2, ~Fold {
                     foldee: ~Ident(2),
                     init: ~Zero,
-                    accum_id: 0,
-                    next_id: 1,
+                    next_id: 0,
+                    accum_id: 1,
                     body: body
                 })
         } else {
@@ -319,7 +320,7 @@ impl RandomGenState {
                         let left = self.gen_expr(left_size, idents, foldable);
                         //println("genning right");
                         let right = self.gen_expr(right_size, idents, foldable);
-                        let op = self.rng.gen::<BinOp>();
+                        let op = self.rng.choose(self.op2_choices);
                         Op2(op, ~left, ~right)
                     }
                     n if n < if_end => {
@@ -417,7 +418,7 @@ impl RandomGenState {
                         let left = self.gen_expr(left_size, idents, foldable);
                         //println("genning right");
                         let right = self.gen_expr(right_size, idents, foldable);
-                        let op = self.rng.gen::<BinOp>();
+                        let op = self.rng.choose(self.op2_choices);
                         Op2(op, ~left, ~right)
                     }
                     n if n < if_end => {
