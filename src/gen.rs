@@ -234,11 +234,42 @@ impl RandomGenState {
     }
 
     fn gen_bonus(&mut self, size: uint) -> Program {
-        //let
+        // program, if, and, one
+        let remaining = size - 1 - 1 - 1 - 1;
 
-        //let expr = ~If0(~And(,~One), )
+        // seems that only one if0 occurs, so disable it from here.
+        self.operators.if0 = false;
 
-        fail!()
+        // need to leave space for the 2 binops, i.e. a minimum of 3 each,
+        let cond_s = self.gen_size(remaining - 6, false);
+        let cond = ~self.gen_expr(cond_s, 1, false);
+
+        let mut arms_s = remaining - cond_s - 2; // the binops themselves
+
+        let then_lhs_s = self.gen_size(arms_s - 3, false);
+        arms_s -= then_lhs_s;
+        let else_lhs_s = self.gen_size(arms_s - 2, false);
+        arms_s -= else_lhs_s;
+
+        let then_rhs_s = self.gen_size(arms_s - 1, false);
+        let else_rhs_s = arms_s - then_rhs_s;
+
+        let then_lhs = ~self.gen_expr(then_lhs_s, 1, false);
+        let then_rhs = ~self.gen_expr(then_rhs_s, 1, false);
+        let else_lhs = ~self.gen_expr(else_lhs_s, 1, false);
+        let else_rhs = ~self.gen_expr(else_rhs_s, 1, false);
+
+        let then_op = self.rng.choose(self.op2_choices);
+        let else_op = self.rng.choose(self.op2_choices);
+
+
+        let expr = ~If0(~Op2(And, cond,~One),
+                        ~Op2(then_op, then_lhs, then_rhs),
+                        ~Op2(else_op, else_lhs, else_rhs));
+
+        let prog = Program::new(0, expr);
+
+        prog
     }
 
     fn gen_expr(&mut self, size: uint, idents: uint, foldable: bool) -> Expr {

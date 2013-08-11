@@ -71,6 +71,7 @@ fn main() {
                     ~"tfold" => Tfolded,
                     ~"all" => All,
                     ~"unfold" => Unfolded,
+                    ~"bonus" => Bonus
                     _ => {
                         println("error: bad filter value, using no filter");
                         All
@@ -138,8 +139,11 @@ fn problems(count: uint, filter: ProblemFilter) {
         .filter(|p| match filter {
             All => true,
             Tfolded => p.problem.operators.tfold,
-            Unfolded => !p.problem.operators.fold && !p.problem.operators.tfold,
+            Unfolded => (!p.problem.operators.fold &&
+                         !p.problem.operators.tfold &&
+                         !p.problem.operators.bonus),
             Folded => p.problem.operators.fold,
+            Bonus => p.problem.operators.bonus,
         })
         .collect();
     sort::tim_sort(unsolved_probs);
@@ -238,6 +242,7 @@ enum ProblemFilter {
     Tfolded,
     Unfolded,
     Folded,
+    Bonus,
 }
 
 struct Statistics {
