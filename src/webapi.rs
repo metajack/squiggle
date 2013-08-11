@@ -37,7 +37,10 @@ pub trait Api {
 
     fn eval(&mut self, problem: Problem, inputs: ~[u64]) -> Port<Option<~[u64]>>;
     fn eval_blocking(&mut self, problem: Problem, inputs: ~[u64]) -> Option<~[u64]> {
-        self.eval(problem, inputs).recv()
+        print("evaluating inputs...");
+        let res = self.eval(problem, inputs).recv();
+        println("done.");
+        res
     }
 
     fn guess(&mut self, problem: Problem, program: ~str) -> Port<GuessResult>;
@@ -579,7 +582,7 @@ fn make_url(path: &str) -> ~str {
 }
 
 fn get_request(url: ~str) -> Json {
-    let mut tries = 5;
+    let mut tries = 15;
     while tries > 0 {
         info!("GET /%s", extract_path(url));
         let mut p = Process::new("curl", [~"-f", url.clone()], ProcessOptions::new());
